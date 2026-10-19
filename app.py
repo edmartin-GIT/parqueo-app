@@ -5,6 +5,7 @@ import re
 import secrets
 import sqlite3
 from datetime import date, datetime, timedelta
+from functools import wraps
 from io import BytesIO
 from zoneinfo import ZoneInfo
 
@@ -54,9 +55,13 @@ def sumar_meses(d, n):
     return date(y, m, min(d.day, calendar.monthrange(y, m)[1]))
 
 
+def fin_ventana():
+    return sumar_meses(hoy(), MESES_ADELANTE)
+
+
 def domingos_disponibles():
     inicio = hoy()
-    fin = sumar_meses(inicio, MESES_ADELANTE)
+    fin = fin_ventana()
     d = inicio + timedelta(days=(6 - inicio.weekday()) % 7)
     domingos = []
     while d <= fin:
@@ -80,8 +85,83 @@ def fecha_corta(iso):
     return f"{d.day} {MESES_ES[d.month - 1][:3]}"
 
 
+def hora12(hhmm):
+    h, m = (int(x) for x in hhmm.split(":"))
+    return f"{h % 12 or 12}:{m:02d} {'AM' if h < 12 else 'PM'}"
+
+
 app.jinja_env.filters["fecha_larga"] = fecha_larga
 app.jinja_env.filters["fecha_corta"] = fecha_corta
+app.jinja_env.filters["hora12"] = hora12
+
+
+# ---------- Turnos (misas dominicales y especiales) ----------
+
+def etiqueta_especial(e):
+    nombre = e["descripcion"] or "Misa especial"
+    return f"{hora12(e['hora'])} · {nombre}"
+
+
+def especiales_en_ventana(conn):
+    return conn.execute(
+        "SELECT * FROM misas_especiales WHERE fecha >= ? AND fecha <= ? ORDER BY fecha, hora, id",
+        (hoy().isoformat(), fin_ventana().isoformat()),
+    ).fetchall()
+
+
+def todos_especiales(conn):
+    return {f"E{e['id']}": e for e in conn.execute("SELECT * FROM misas_especiales")}
+
+
+def etiqueta_turno(misa, especiales):
+    if misa in MISAS:
+        return MISAS[misa]
+    e = especiales.get(misa)
+    return etiqueta_especial(e) if e else "Misa eliminada"
+
+
+def cupo_turno(conn, fecha, misa):
+    """Cupo del turno, o None si el turno no existe (misa invalida o fecha que no corresponde)."""
+    if misa in MISAS:
+        return CUPO_MAXIMO
+    if misa.startswith("E") and misa[1:].isdigit():
+        e = conn.execute("SELECT fecha, cupo FROM misas_especiales WHERE id=?", (int(misa[1:]),)).fetchone()
+        if e and e["fecha"] == fecha:
+            return e["cupo"]
+    return None
+
+
+def conteos(conn):
+    filas = conn.execute(
+        "SELECT fecha, misa, COUNT(*) AS n FROM registros GROUP BY fecha, misa"
+    ).fetchall()
+    return {(f["fecha"], f["misa"]): f["n"] for f in filas}
+
+
+def insertar_registro(conn, nombre, apellido, celular, fecha, misa, excluir_id=None):
+    """Devuelve 'ok', 'lleno', 'duplicado' o 'invalido'. Atomico: bloquea escritura mientras cuenta e inserta."""
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        cupo = cupo_turno(conn, fecha, misa)
+        if cupo is None:
+            conn.rollback()
+            return "invalido"
+        n = conn.execute(
+            "SELECT COUNT(*) FROM registros WHERE fecha=? AND misa=? AND id IS NOT ?",
+            (fecha, misa, excluir_id),
+        ).fetchone()[0]
+        if n >= cupo:
+            conn.rollback()
+            return "lleno"
+        conn.execute(
+            "INSERT INTO registros (nombre, apellido, celular, fecha, misa) VALUES (?,?,?,?,?)",
+            (nombre, apellido, celular, fecha, misa),
+        )
+        conn.commit()
+        return "ok"
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        return "duplicado"
 
 
 # ---------- Utilidades ----------
@@ -97,35 +177,6 @@ def normalizar_celular(valor):
 
 def limpiar_texto(valor, largo=60):
     return re.sub(r"\s+", " ", (valor or "").strip())[:largo]
-
-
-def conteos(conn):
-    filas = conn.execute(
-        "SELECT fecha, misa, COUNT(*) AS n FROM registros GROUP BY fecha, misa"
-    ).fetchall()
-    return {(f["fecha"], f["misa"]): f["n"] for f in filas}
-
-
-def insertar_registro(conn, nombre, apellido, celular, fecha, misa, excluir_id=None):
-    """Devuelve 'ok', 'lleno' o 'duplicado'. Atomico: bloquea escritura mientras cuenta e inserta."""
-    conn.execute("BEGIN IMMEDIATE")
-    try:
-        n = conn.execute(
-            "SELECT COUNT(*) FROM registros WHERE fecha=? AND misa=? AND id IS NOT ?",
-            (fecha, misa, excluir_id),
-        ).fetchone()[0]
-        if n >= CUPO_MAXIMO:
-            conn.rollback()
-            return "lleno"
-        conn.execute(
-            "INSERT INTO registros (nombre, apellido, celular, fecha, misa) VALUES (?,?,?,?,?)",
-            (nombre, apellido, celular, fecha, misa),
-        )
-        conn.commit()
-        return "ok"
-    except sqlite3.IntegrityError:
-        conn.rollback()
-        return "duplicado"
 
 
 def es_admin():
@@ -145,8 +196,6 @@ app.jinja_env.globals["CUPO"] = CUPO_MAXIMO
 
 
 def requiere_admin(f):
-    from functools import wraps
-
     @wraps(f)
     def envoltura(*args, **kwargs):
         if not es_admin():
@@ -162,10 +211,10 @@ def requiere_admin(f):
 
 # ---------- Publico ----------
 
-def construir_meses(cuentas, domingos):
+def construir_meses(cuentas, domingos, fechas_especiales):
     disponibles = {d.isoformat() for d in domingos}
     primero = hoy().replace(day=1)
-    ultimo = sumar_meses(hoy(), MESES_ADELANTE)
+    ultimo = fin_ventana()
     meses = []
     y, m = primero.year, primero.month
     cal = calendar.Calendar(firstweekday=6)
@@ -178,7 +227,8 @@ def construir_meses(cuentas, domingos):
                     fila.append(None)
                     continue
                 iso = d.isoformat()
-                celda = {"dia": d.day, "fecha": iso, "domingo": False}
+                celda = {"dia": d.day, "fecha": iso, "domingo": False,
+                         "especial": iso in fechas_especiales}
                 if iso in disponibles:
                     celda["domingo"] = True
                     celda["cuentas"] = {k: cuentas.get((iso, k), 0) for k in MISAS}
@@ -191,15 +241,25 @@ def construir_meses(cuentas, domingos):
     return meses
 
 
-def pagina_registro(datos=None, seleccionadas=()):
+def pagina_registro(datos=None, seleccionadas=(), especiales_sel=()):
     conn = get_conn()
     cuentas = conteos(conn)
+    esp = especiales_en_ventana(conn)
     conn.close()
+    especiales = []
+    for e in esp:
+        n = cuentas.get((e["fecha"], f"E{e['id']}"), 0)
+        especiales.append({
+            "id": e["id"], "fecha": e["fecha"], "etiqueta": etiqueta_especial(e),
+            "n": n, "cupo": e["cupo"], "lleno": n >= e["cupo"],
+        })
     return render_template(
         "index.html",
-        meses=construir_meses(cuentas, domingos_disponibles()),
+        meses=construir_meses(cuentas, domingos_disponibles(), {e["fecha"] for e in esp}),
+        especiales=especiales,
         datos=datos or {"misa": "1030"},
         seleccionadas=set(seleccionadas),
+        especiales_sel={str(x) for x in especiales_sel},
         titulo_pagina="Registro de servidores",
     )
 
@@ -216,10 +276,11 @@ def registrar():
     celular = normalizar_celular(request.form.get("celular"))
     misa = request.form.get("misa", "")
     fechas = sorted(set(request.form.getlist("fechas")))
+    ids_especiales = sorted({x for x in request.form.getlist("especiales") if x.isdigit()}, key=int)
     validas = {d.isoformat() for d in domingos_disponibles()}
 
     datos = {"nombre": nombre, "apellido": apellido,
-             "celular": request.form.get("celular", ""), "misa": misa or "1030"}
+             "celular": request.form.get("celular", ""), "misa": misa if misa in MISAS else "1030"}
     errores = []
     if not nombre:
         errores.append("Nombre es requerido.")
@@ -227,36 +288,49 @@ def registrar():
         errores.append("Apellido es requerido.")
     if not celular:
         errores.append("El celular debe tener 10 digitos.")
-    if misa not in MISAS:
-        errores.append("Elige un horario de misa.")
-    if not fechas:
-        errores.append("Elige al menos un domingo en el calendario.")
+    if not fechas and not ids_especiales:
+        errores.append("Elige al menos un domingo en el calendario o una misa especial.")
+    if fechas and misa not in MISAS:
+        errores.append("Elige un horario de misa para los domingos.")
     if any(f not in validas for f in fechas):
         errores.append("Una de las fechas elegidas no esta disponible.")
     if errores:
         for e in errores:
             flash(e, "error")
-        return pagina_registro(datos, fechas)
+        return pagina_registro(datos, fechas, ids_especiales)
 
     conn = get_conn()
-    ok, omitidos = [], []
-    for f in fechas:
-        resultado = insertar_registro(conn, nombre, apellido, celular, f, misa)
-        if resultado == "ok":
-            ok.append(fecha_corta(f))
-        elif resultado == "lleno":
-            omitidos.append(f"{fecha_corta(f)} (lleno)")
+    especiales = {e["id"]: e for e in especiales_en_ventana(conn)}
+    turnos = [(f, misa, f"{fecha_corta(f)} {MISAS[misa]}") for f in fechas]
+    for x in ids_especiales:
+        e = especiales.get(int(x))
+        if e:
+            turnos.append((e["fecha"], f"E{e['id']}", f"{fecha_corta(e['fecha'])} {etiqueta_especial(e)}"))
         else:
-            omitidos.append(f"{fecha_corta(f)} (ya estabas inscrito)")
+            turnos.append((None, None, "una misa especial (ya no esta disponible)"))
+
+    ok, omitidos = [], []
+    for fecha, clave, texto in turnos:
+        if fecha is None:
+            omitidos.append(texto)
+            continue
+        resultado = insertar_registro(conn, nombre, apellido, celular, fecha, clave)
+        if resultado == "ok":
+            ok.append(texto)
+        elif resultado == "lleno":
+            omitidos.append(f"{texto} (lleno)")
+        elif resultado == "duplicado":
+            omitidos.append(f"{texto} (ya estabas inscrito)")
+        else:
+            omitidos.append(f"{texto} (no disponible)")
     conn.close()
 
     if ok:
-        flash(f"Listo, {nombre}. Quedaste registrado en la misa de {MISAS[misa]} los domingos: "
-              f"{', '.join(ok)}.", "success")
+        flash(f"Listo, {nombre}. Quedaste registrado en: {'; '.join(ok)}.", "success")
     if omitidos:
-        flash(f"No se registro: {', '.join(omitidos)}.", "error")
+        flash(f"No se registro: {'; '.join(omitidos)}.", "error")
     if not ok:
-        return pagina_registro(datos, [])
+        return pagina_registro(datos, [], [])
     return redirect(url_for("index"))
 
 
@@ -266,18 +340,24 @@ def turnos():
     filas = conn.execute(
         "SELECT fecha, misa, nombre, apellido FROM registros ORDER BY fecha, misa, creado, id"
     ).fetchall()
+    esp = especiales_en_ventana(conn)
     conn.close()
     por_turno = {}
     for f in filas:
         por_turno.setdefault((f["fecha"], f["misa"]), []).append(f"{f['nombre']} {f['apellido']}")
-    domingos = [
-        {
-            "fecha": d.isoformat(),
-            "misas": [{"id": k, "etiqueta": v, "nombres": por_turno.get((d.isoformat(), k), [])}
-                      for k, v in MISAS.items()],
-        }
-        for d in domingos_disponibles()
-    ]
+
+    dias = {}
+    for d in domingos_disponibles():
+        iso = d.isoformat()
+        dias[iso] = [{"etiqueta": v, "especial": False, "cupo": CUPO_MAXIMO,
+                      "nombres": por_turno.get((iso, k), [])} for k, v in MISAS.items()]
+    for e in esp:
+        clave = f"E{e['id']}"
+        dias.setdefault(e["fecha"], []).append({
+            "etiqueta": etiqueta_especial(e), "especial": True, "cupo": e["cupo"],
+            "nombres": por_turno.get((e["fecha"], clave), []),
+        })
+    domingos = [{"fecha": f, "misas": dias[f]} for f in sorted(dias)]
     return render_template("turnos.html", domingos=domingos, titulo_pagina="Turnos por domingo")
 
 
@@ -315,16 +395,41 @@ def registros_filtrados(fecha):
     else:
         filas = conn.execute("SELECT * FROM registros ORDER BY fecha, misa, creado, id").fetchall()
     fechas = [r["fecha"] for r in conn.execute("SELECT DISTINCT fecha FROM registros ORDER BY fecha")]
+    especiales = todos_especiales(conn)
     conn.close()
-    return filas, fechas
+    filas = [{**dict(r), "turno": etiqueta_turno(r["misa"], especiales)} for r in filas]
+    return filas, fechas, especiales
+
+
+def opciones_turnos(incluir=None):
+    """Todos los turnos disponibles como (valor 'fecha|misa', etiqueta), en orden cronologico."""
+    conn = get_conn()
+    esp = especiales_en_ventana(conn)
+    todos = todos_especiales(conn)
+    conn.close()
+    opciones = {}
+    for d in domingos_disponibles():
+        iso = d.isoformat()
+        for k, v in MISAS.items():
+            opciones[(iso, k)] = f"{fecha_larga(iso)} · {v}"
+    for e in esp:
+        iso = e["fecha"]
+        opciones[(iso, f"E{e['id']}")] = f"{fecha_larga(iso)} · {etiqueta_especial(e)}"
+    if incluir and incluir not in opciones:
+        f, k = incluir
+        opciones[incluir] = f"{fecha_larga(f)} · {etiqueta_turno(k, todos)}"
+    return [(f"{f}|{k}", t) for (f, k), t in sorted(opciones.items())]
 
 
 @app.route("/admin")
 @requiere_admin
 def admin():
     fecha = request.args.get("fecha", "")
-    filas, fechas_con_datos = registros_filtrados(fecha)
-    todas = sorted({d.isoformat() for d in domingos_disponibles()} | set(fechas_con_datos))
+    filas, fechas_con_datos, _ = registros_filtrados(fecha)
+    conn = get_conn()
+    fechas_esp = {e["fecha"] for e in especiales_en_ventana(conn)}
+    conn.close()
+    todas = sorted({d.isoformat() for d in domingos_disponibles()} | set(fechas_con_datos) | fechas_esp)
     return render_template("admin.html", filas=filas, fechas=todas, filtro=fecha,
                            titulo_pagina="Administrar registros")
 
@@ -334,19 +439,24 @@ def datos_formulario_admin():
     nombre = limpiar_texto(request.form.get("nombre"))
     apellido = limpiar_texto(request.form.get("apellido"))
     celular = normalizar_celular(request.form.get("celular"))
-    fecha = request.form.get("fecha", "")
-    misa = request.form.get("misa", "")
+    turno = request.form.get("turno", "")
+    fecha, _, misa = turno.partition("|")
     try:
         date.fromisoformat(fecha)
     except ValueError:
-        errores.append("Fecha invalida.")
+        errores.append("Turno invalido.")
     if not nombre or not apellido:
         errores.append("Nombre y apellido son requeridos.")
     if not celular:
         errores.append("El celular debe tener 10 digitos.")
-    if misa not in MISAS:
-        errores.append("Horario de misa invalido.")
     return errores, (nombre, apellido, celular, fecha, misa)
+
+
+def formulario_registro(datos, titulo, **extra):
+    incluir = (datos["fecha"], datos["misa"]) if datos.get("fecha") and datos.get("misa") else None
+    return render_template("admin_form.html", datos=datos, opciones=opciones_turnos(incluir),
+                           turno_actual=f"{datos.get('fecha', '')}|{datos.get('misa', '')}",
+                           titulo=titulo, titulo_pagina=titulo, **extra)
 
 
 @app.route("/admin/nuevo", methods=["GET", "POST"])
@@ -361,15 +471,14 @@ def admin_nuevo():
             if res == "ok":
                 flash("Servidor añadido.", "success")
                 return redirect(url_for("admin", fecha=datos[3]))
-            errores.append("Esa misa ya tiene 8 servidores." if res == "lleno"
-                           else "Ese celular ya esta inscrito en esa misa.")
+            errores.append({"lleno": "Ese turno ya esta lleno.",
+                            "invalido": "Ese turno no existe."}.get(
+                                res, "Ese celular ya esta inscrito en ese turno."))
         for e in errores:
             flash(e, "error")
         d = dict(zip(("nombre", "apellido", "celular", "fecha", "misa"), datos))
-        return render_template("admin_form.html", datos=d, domingos=domingos_disponibles(),
-                               titulo="Añadir servidor", titulo_pagina="Añadir servidor")
-    return render_template("admin_form.html", datos={"misa": "1030"}, domingos=domingos_disponibles(),
-                           titulo="Añadir servidor", titulo_pagina="Añadir servidor")
+        return formulario_registro(d, "Añadir servidor")
+    return formulario_registro({"misa": "1030"}, "Añadir servidor")
 
 
 @app.route("/admin/editar/<int:id>", methods=["GET", "POST"])
@@ -389,13 +498,17 @@ def admin_editar(id):
             conn = get_conn()
             conn.execute("BEGIN IMMEDIATE")
             try:
+                cupo = cupo_turno(conn, fecha, misa)
                 n = conn.execute(
                     "SELECT COUNT(*) FROM registros WHERE fecha=? AND misa=? AND id!=?",
                     (fecha, misa, id),
                 ).fetchone()[0]
-                if n >= CUPO_MAXIMO:
+                if cupo is None:
                     conn.rollback()
-                    errores.append("Esa misa ya tiene 8 servidores.")
+                    errores.append("Ese turno no existe.")
+                elif n >= cupo:
+                    conn.rollback()
+                    errores.append("Ese turno ya esta lleno.")
                 else:
                     conn.execute(
                         "UPDATE registros SET nombre=?, apellido=?, celular=?, fecha=?, misa=? WHERE id=?",
@@ -407,21 +520,14 @@ def admin_editar(id):
                     return redirect(url_for("admin", fecha=fecha))
             except sqlite3.IntegrityError:
                 conn.rollback()
-                errores.append("Ese celular ya esta inscrito en esa misa.")
+                errores.append("Ese celular ya esta inscrito en ese turno.")
             conn.close()
         for e in errores:
             flash(e, "error")
         d = dict(zip(("nombre", "apellido", "celular", "fecha", "misa"), datos))
         d["id"] = id
-        datos_form = d
-    else:
-        datos_form = dict(fila)
-
-    domingos = domingos_disponibles()
-    if datos_form.get("fecha") and date.fromisoformat(datos_form["fecha"]) not in domingos:
-        domingos = [date.fromisoformat(datos_form["fecha"])] + domingos
-    return render_template("admin_form.html", datos=datos_form, domingos=domingos, editar=True,
-                           titulo="Modificar servidor", titulo_pagina="Modificar servidor")
+        return formulario_registro(d, "Modificar servidor", editar=True)
+    return formulario_registro(dict(fila), "Modificar servidor", editar=True)
 
 
 @app.route("/admin/eliminar/<int:id>", methods=["POST"])
@@ -435,10 +541,121 @@ def admin_eliminar(id):
     return redirect(url_for("admin", fecha=request.form.get("fecha", "")))
 
 
+# ---------- Administrador: misas especiales ----------
+
+@app.route("/admin/especiales")
+@requiere_admin
+def admin_especiales():
+    conn = get_conn()
+    filas = conn.execute("SELECT * FROM misas_especiales ORDER BY fecha, hora, id").fetchall()
+    cuentas = conteos(conn)
+    conn.close()
+    especiales = [{**dict(e), "etiqueta": etiqueta_especial(e),
+                   "n": cuentas.get((e["fecha"], f"E{e['id']}"), 0),
+                   "pasada": e["fecha"] < hoy().isoformat()} for e in filas]
+    return render_template("admin_especiales.html", especiales=especiales,
+                           titulo_pagina="Misas especiales")
+
+
+def datos_especial():
+    errores = []
+    fecha = request.form.get("fecha", "")
+    hora = request.form.get("hora", "")
+    descripcion = limpiar_texto(request.form.get("descripcion"), 80)
+    try:
+        d = date.fromisoformat(fecha)
+        if d < hoy() or d > fin_ventana():
+            errores.append(f"La fecha debe estar entre hoy y el {fecha_larga(fin_ventana().isoformat())}.")
+    except ValueError:
+        errores.append("Fecha invalida.")
+    if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", hora):
+        errores.append("Hora invalida.")
+    try:
+        cupo = int(request.form.get("cupo", CUPO_MAXIMO))
+        if not 1 <= cupo <= 50:
+            raise ValueError
+    except ValueError:
+        errores.append("El cupo debe ser un numero entre 1 y 50.")
+        cupo = CUPO_MAXIMO
+    return errores, {"fecha": fecha, "hora": hora, "descripcion": descripcion, "cupo": cupo}
+
+
+@app.route("/admin/especiales/nueva", methods=["GET", "POST"])
+@requiere_admin
+def admin_especial_nueva():
+    datos = {"fecha": "", "hora": "19:00", "descripcion": "", "cupo": CUPO_MAXIMO}
+    if request.method == "POST":
+        errores, datos = datos_especial()
+        if not errores:
+            conn = get_conn()
+            conn.execute(
+                "INSERT INTO misas_especiales (fecha, hora, descripcion, cupo) VALUES (?,?,?,?)",
+                (datos["fecha"], datos["hora"], datos["descripcion"], datos["cupo"]),
+            )
+            conn.commit()
+            conn.close()
+            flash("Misa especial creada. Ya aparece en el registro publico.", "success")
+            return redirect(url_for("admin_especiales"))
+        for e in errores:
+            flash(e, "error")
+    return render_template("admin_especial_form.html", datos=datos, titulo="Nueva misa especial",
+                           minimo=hoy().isoformat(), maximo=fin_ventana().isoformat(),
+                           titulo_pagina="Nueva misa especial")
+
+
+@app.route("/admin/especiales/editar/<int:id>", methods=["GET", "POST"])
+@requiere_admin
+def admin_especial_editar(id):
+    conn = get_conn()
+    fila = conn.execute("SELECT * FROM misas_especiales WHERE id=?", (id,)).fetchone()
+    if fila is None:
+        conn.close()
+        flash("Misa especial no encontrada.", "error")
+        return redirect(url_for("admin_especiales"))
+    datos = dict(fila)
+    if request.method == "POST":
+        errores, datos = datos_especial()
+        if not errores:
+            clave = f"E{id}"
+            inscritos = conn.execute("SELECT COUNT(*) FROM registros WHERE misa=?", (clave,)).fetchone()[0]
+            if datos["cupo"] < inscritos:
+                errores.append(f"Ya hay {inscritos} servidores inscritos; el cupo no puede ser menor.")
+            else:
+                conn.execute("BEGIN IMMEDIATE")
+                conn.execute(
+                    "UPDATE misas_especiales SET fecha=?, hora=?, descripcion=?, cupo=? WHERE id=?",
+                    (datos["fecha"], datos["hora"], datos["descripcion"], datos["cupo"], id),
+                )
+                conn.execute("UPDATE registros SET fecha=? WHERE misa=?", (datos["fecha"], clave))
+                conn.commit()
+                conn.close()
+                flash("Misa especial actualizada.", "success")
+                return redirect(url_for("admin_especiales"))
+        for e in errores:
+            flash(e, "error")
+    conn.close()
+    return render_template("admin_especial_form.html", datos=datos, titulo="Modificar misa especial",
+                           minimo=hoy().isoformat(), maximo=fin_ventana().isoformat(), editar=True,
+                           titulo_pagina="Modificar misa especial")
+
+
+@app.route("/admin/especiales/eliminar/<int:id>", methods=["POST"])
+@requiere_admin
+def admin_especial_eliminar(id):
+    conn = get_conn()
+    conn.execute("BEGIN IMMEDIATE")
+    borrados = conn.execute("DELETE FROM registros WHERE misa=?", (f"E{id}",)).rowcount
+    conn.execute("DELETE FROM misas_especiales WHERE id=?", (id,))
+    conn.commit()
+    conn.close()
+    flash(f"Misa especial eliminada ({borrados} inscripciones borradas).", "success")
+    return redirect(url_for("admin_especiales"))
+
+
 @app.route("/admin/exportar")
 @requiere_admin
 def admin_exportar():
-    filas, _ = registros_filtrados("")
+    filas, _, _ = registros_filtrados("")
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Turnos de Parqueo"
@@ -446,7 +663,7 @@ def admin_exportar():
     for c in ws[1]:
         c.font = Font(bold=True)
     for r in filas:
-        ws.append([r["fecha"], MISAS[r["misa"]], r["nombre"], r["apellido"], r["celular"]])
+        ws.append([r["fecha"], r["turno"], r["nombre"], r["apellido"], r["celular"]])
     for col in ws.columns:
         ancho = max((len(str(c.value)) for c in col if c.value is not None), default=10)
         ws.column_dimensions[col[0].column_letter].width = ancho + 2

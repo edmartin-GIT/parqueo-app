@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Misas especiales - Turnos de Parqueo La Guadalupe{% endblock %}
+{% block content %}
+<div class="admin-barra">
+    <h2>Misas especiales</h2>
+    <div class="admin-acciones">
+        <a class="nav-btn btn-verde" href="{{ url_for('admin_especial_nueva') }}">Nueva misa especial</a>
+        <a class="nav-btn btn-gris" href="{{ url_for('admin') }}">Volver a registros</a>
+    </div>
+</div>
+<p class="ayuda" style="margin-bottom:14px">Crea una misa para cualquier dia de la semana (por ejemplo una fiesta o una novena). Aparece en el registro publico con una ★ en el calendario.</p>
+
+<div class="tabla-wrap">
+<table class="tabla-principal">
+    <thead>
+        <tr><th>Fecha</th><th>Misa</th><th>Inscritos</th><th>Acciones</th></tr>
+    </thead>
+    <tbody>
+    {% for e in especiales %}
+        <tr {% if e.pasada %}class="fila-pasada"{% endif %}>
+            <td data-label="Fecha">{{ e.fecha|fecha_larga }}{% if e.pasada %} (pasada){% endif %}</td>
+            <td data-label="Misa">{{ e.etiqueta }}</td>
+            <td data-label="Inscritos">{{ e.n }}/{{ e.cupo }}</td>
+            <td class="acciones" data-label="Acciones">
+                <a href="{{ url_for('admin', fecha=e.fecha) }}">Ver servidores</a>
+                <a href="{{ url_for('admin_especial_editar', id=e.id) }}">Modificar</a>
+                <form method="post" action="{{ url_for('admin_especial_eliminar', id=e.id) }}"
+                      onsubmit="return confirm('Eliminar esta misa y sus {{ e.n }} inscripciones?');">
+                    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+                    <button type="submit">Borrar</button>
+                </form>
+            </td>
+        </tr>
+    {% else %}
+        <tr><td colspan="4">Todavia no hay misas especiales.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

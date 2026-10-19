@@ -31,6 +31,21 @@ Cada misa tiene un maximo de {{ CUPO }} servidores. Puedes inscribirte hasta con
             {% endfor %}
         </fieldset>
 
+        {% if especiales %}
+        <fieldset class="especiales">
+            <legend>Misas especiales (★ en el calendario)</legend>
+            {% for e in especiales %}
+            <label class="esp-op {% if e.lleno %}lleno{% endif %}">
+                <input type="checkbox" name="especiales" value="{{ e.id }}"
+                       {% if e.lleno and e.id|string not in especiales_sel %}disabled{% endif %}
+                       {% if e.id|string in especiales_sel %}checked{% endif %}>
+                <span class="esp-txt"><b>{{ e.fecha|fecha_larga }}</b><br>{{ e.etiqueta }}</span>
+                <span class="esp-cnt">{% if e.lleno %}Lleno{% else %}{{ e.n }}/{{ e.cupo }}{% endif %}</span>
+            </label>
+            {% endfor %}
+        </fieldset>
+        {% endif %}
+
         <p class="ayuda">Despues elige los domingos en el calendario.</p>
         <p id="resumen-fechas" class="ayuda" aria-live="polite"></p>
         <button type="submit" class="btn-enviar">Registrarme</button>
@@ -57,11 +72,11 @@ Cada misa tiene un maximo de {{ CUPO }} servidores. Puedes inscribirte hasta con
                         <input type="checkbox" name="fechas" value="{{ c.fecha }}"
                                {% for k, n in c.cuentas.items() %}data-c{{ k }}="{{ n }}" {% endfor %}
                                {% if c.fecha in seleccionadas %}checked{% endif %}>
-                        <span class="n">{{ c.dia }}</span>
+                        <span class="n">{{ c.dia }}{% if c.especial %} <span class="estrella" title="Misa especial">★</span>{% endif %}</span>
                         <span class="c"></span>
                     </label>
                     {% else %}
-                    <div class="dia otro">{{ c.dia }}</div>
+                    <div class="dia otro{% if c.especial %} con-especial{% endif %}">{{ c.dia }}{% if c.especial %}<span class="estrella" title="Misa especial">★</span>{% endif %}</div>
                     {% endif %}
                 {% endfor %}{% endfor %}
             </div>
@@ -108,9 +123,9 @@ Cada misa tiene un maximo de {{ CUPO }} servidores. Puedes inscribirte hasta con
         document.getElementById('calendario-nota').textContent = misa
             ? 'Cupos mostrados para la misa de ' + etiquetas[misa] + '.'
             : 'Elige un horario de misa para ver los cupos.';
-        var sel = form.querySelectorAll('input[name="fechas"]:checked').length;
+        var sel = form.querySelectorAll('input[name="fechas"]:checked, input[name="especiales"]:checked').length;
         document.getElementById('resumen-fechas').textContent = sel
-            ? 'Domingos elegidos: ' + sel : 'Aun no has elegido domingos.';
+            ? 'Turnos elegidos: ' + sel : 'Aun no has elegido turnos.';
     }
     form.addEventListener('change', refrescar);
     refrescar();

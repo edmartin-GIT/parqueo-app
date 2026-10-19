@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }} - Turnos de Parqueo La Guadalupe{% endblock %}
+{% block content %}
+<h2>{{ titulo }}</h2>
+<form method="post" class="formulario angosto">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <label>Fecha (cualquier dia de la semana)
+        <input type="date" name="fecha" value="{{ datos.fecha or '' }}" min="{{ minimo }}" max="{{ maximo }}" required>
+    </label>
+    <label>Hora
+        <input type="time" name="hora" value="{{ datos.hora or '19:00' }}" required>
+    </label>
+    <label>Descripcion (opcional)
+        <input type="text" name="descripcion" value="{{ datos.descripcion or '' }}" maxlength="80"
+               placeholder="Ej: Fiesta de Nuestra Señora de Guadalupe">
+    </label>
+    <label>Cupo de servidores
+        <input type="number" name="cupo" value="{{ datos.cupo or 8 }}" min="1" max="50" required>
+    </label>
+    <p class="ayuda">Las fechas disponibles van desde hoy hasta {{ maximo|fecha_larga }}.</p>
+    <button type="submit" class="btn-enviar">Guardar</button>
+    <a class="boton-secundario" href="{{ url_for('admin_especiales') }}">Cancelar</a>
+</form>
+{% endblock %}

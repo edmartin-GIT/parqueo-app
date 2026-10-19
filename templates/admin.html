@@ -5,6 +5,7 @@
     <h2>Administrar registros</h2>
     <div class="admin-acciones">
         <a class="nav-btn btn-verde" href="{{ url_for('admin_nuevo') }}">Añadir servidor</a>
+        <a class="nav-btn btn-rojo" href="{{ url_for('admin_especiales') }}">Misas especiales</a>
         <a class="nav-btn btn-negro" href="{{ url_for('admin_exportar') }}">Exportar a Excel</a>
         <form method="post" action="{{ url_for('admin_salir') }}">
             <input type="hidden" name="csrf" value="{{ csrf_token() }}">
@@ -28,13 +29,13 @@
 <div class="tabla-wrap">
 <table class="tabla-principal">
     <thead>
-        <tr><th>Domingo</th><th>Misa</th><th>Nombre</th><th>Apellido</th><th>Celular</th><th>Acciones</th></tr>
+        <tr><th>Fecha</th><th>Misa</th><th>Nombre</th><th>Apellido</th><th>Celular</th><th>Acciones</th></tr>
     </thead>
     <tbody>
     {% for r in filas %}
         <tr>
             <td data-label="Domingo">{{ r.fecha|fecha_corta }}</td>
-            <td data-label="Misa">{{ MISAS[r.misa] }}</td>
+            <td data-label="Misa">{{ r.turno }}</td>
             <td data-label="Nombre">{{ r.nombre }}</td>
             <td data-label="Apellido">{{ r.apellido }}</td>
             <td data-label="Celular">{{ r.celular }}</td>

@@ -8,6 +8,7 @@ DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 CUPO_MAXIMO = 8
 MESES_ADELANTE = 3
 
+# Misas dominicales fijas. Las misas especiales usan la clave "E<id>".
 MISAS = {
     "1030": "10:30 AM",
     "1330": "1:30 PM",
@@ -22,6 +23,36 @@ def get_conn():
     return conn
 
 
+def _migrar_registros(conn):
+    """Las bases creadas antes de las misas especiales tienen un CHECK que solo
+    admite los 3 horarios dominicales. Se reconstruye la tabla sin ese CHECK."""
+    fila = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='registros'"
+    ).fetchone()
+    if fila is None or "CHECK" not in (fila["sql"] or "").upper():
+        return
+    conn.executescript(
+        """
+        BEGIN;
+        CREATE TABLE registros_nueva (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            apellido TEXT NOT NULL,
+            celular TEXT NOT NULL,
+            fecha TEXT NOT NULL,
+            misa TEXT NOT NULL,
+            creado TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(fecha, misa, celular)
+        );
+        INSERT INTO registros_nueva (id, nombre, apellido, celular, fecha, misa, creado)
+            SELECT id, nombre, apellido, celular, fecha, misa, creado FROM registros;
+        DROP TABLE registros;
+        ALTER TABLE registros_nueva RENAME TO registros;
+        COMMIT;
+        """
+    )
+
+
 def init_db():
     conn = get_conn()
     conn.executescript(
@@ -32,12 +63,20 @@ def init_db():
             apellido TEXT NOT NULL,
             celular TEXT NOT NULL,
             fecha TEXT NOT NULL,
-            misa TEXT NOT NULL CHECK(misa IN ('1030', '1330', '1900')),
+            misa TEXT NOT NULL,
             creado TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(fecha, misa, celular)
         );
-        CREATE INDEX IF NOT EXISTS idx_registros_turno ON registros(fecha, misa);
+        CREATE TABLE IF NOT EXISTS misas_especiales (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha TEXT NOT NULL,
+            hora TEXT NOT NULL,
+            descripcion TEXT NOT NULL DEFAULT '',
+            cupo INTEGER NOT NULL DEFAULT 8 CHECK(cupo BETWEEN 1 AND 50)
+        );
         """
     )
+    _migrar_registros(conn)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_registros_turno ON registros(fecha, misa)")
     conn.commit()
     conn.close()

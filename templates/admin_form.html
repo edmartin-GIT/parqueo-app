@@ -13,17 +13,10 @@
     <label>Celular
         <input type="tel" name="celular" value="{{ datos.celular or '' }}" placeholder="(305) 555-0123" required>
     </label>
-    <label>Domingo
-        <select name="fecha" required>
-            {% for d in domingos %}
-            <option value="{{ d.isoformat() }}" {% if datos.fecha == d.isoformat() %}selected{% endif %}>{{ d.isoformat()|fecha_larga }}</option>
-            {% endfor %}
-        </select>
-    </label>
-    <label>Misa
-        <select name="misa" required>
-            {% for id, etiqueta in MISAS.items() %}
-            <option value="{{ id }}" {% if datos.misa == id %}selected{% endif %}>{{ etiqueta }}</option>
+    <label>Turno (domingo o misa especial)
+        <select name="turno" required>
+            {% for valor, etiqueta in opciones %}
+            <option value="{{ valor }}" {% if valor == turno_actual %}selected{% endif %}>{{ etiqueta }}</option>
             {% endfor %}
         </select>
     </label>

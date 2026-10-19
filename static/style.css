@@ -149,3 +149,23 @@ th { background: #eef2f6; }
     td { border: none; padding: 4px 6px; }
     td::before { content: attr(data-label); font-weight: 600; display: inline-block; min-width: 90px; color: #555; }
 }
+
+/* Misas especiales */
+fieldset.especiales { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+fieldset.especiales legend { font-size: 14px; color: #444; padding: 0; margin-bottom: 6px; }
+.formulario .esp-op { flex-direction: row; align-items: center; gap: 10px; position: relative; border: 1.5px solid #d4a017; background: #fff8e1; border-radius: 6px; padding: 10px 12px; cursor: pointer; color: #222; }
+.esp-op input { width: 20px; height: 20px; flex: none; margin: 0; }
+.esp-txt { flex: 1; min-width: 0; font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; }
+.esp-txt b { text-transform: capitalize; }
+.esp-cnt { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: #7a5b00; }
+.esp-op:has(input:checked) { background: #c0392b; border-color: #c0392b; color: white; }
+.esp-op:has(input:checked) .esp-cnt { color: white; }
+.esp-op.lleno { background: #eceff1; border-color: #cfd8dc; color: #78909c; cursor: not-allowed; }
+.esp-op:has(input:focus-visible) { outline: 3px solid #1f3a5f; outline-offset: 2px; }
+.estrella { color: #d4a017; font-size: 13px; }
+.dia.domingo:has(input:checked) .estrella { color: white; }
+.dia.con-especial { border: 1.5px dashed #d4a017; background: #fff8e1; flex-direction: row; justify-content: space-between; color: #444; }
+.slot-especial { background: #fffdf3; }
+.fila-pasada { opacity: .55; }
+.slots { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+@media (max-width: 720px) { .slots { grid-template-columns: minmax(0, 1fr); } }
