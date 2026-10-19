@@ -3,7 +3,7 @@
 {% block content %}
 
 <p class="intro">Elige tu horario de misa, marca en el calendario los domingos en que puedes servir y registra tus datos.
-Cada misa tiene un máximo de {{ CUPO }} servidores. Puedes inscribirte hasta con 3 meses de anticipación.
+Cada misa tiene un mínimo de {{ CUPO }} servidores. Puedes inscribirte hasta con 3 meses de anticipación.
 <strong>IMPORTANTE: debes llegar con 30 minutos de anticipación al turno seleccionado, es decir 10:00 AM, 1:00 PM y 6:30 PM.</strong></p>
 
 <form method="post" action="{{ url_for('registrar') }}" class="registro" id="registro">
