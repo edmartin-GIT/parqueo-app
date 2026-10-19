@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Administrador - Turnos de Parqueo La Guadalupe{% endblock %}
+{% block content %}
+<h2>Acceso de administrador</h2>
+<form method="post" class="formulario angosto">
+    <label>Contraseña
+        <input type="password" name="password" autocomplete="current-password" required autofocus>
+    </label>
+    <button type="submit" class="btn-enviar">Entrar</button>
+</form>
+{% endblock %}

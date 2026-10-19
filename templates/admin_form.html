@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }} - Turnos de Parqueo La Guadalupe{% endblock %}
+{% block content %}
+<h2>{{ titulo }}</h2>
+<form method="post" class="formulario angosto">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <label>Nombre
+        <input type="text" name="nombre" value="{{ datos.nombre or '' }}" maxlength="60" required>
+    </label>
+    <label>Apellido
+        <input type="text" name="apellido" value="{{ datos.apellido or '' }}" maxlength="60" required>
+    </label>
+    <label>Celular
+        <input type="tel" name="celular" value="{{ datos.celular or '' }}" placeholder="(305) 555-0123" required>
+    </label>
+    <label>Domingo
+        <select name="fecha" required>
+            {% for d in domingos %}
+            <option value="{{ d.isoformat() }}" {% if datos.fecha == d.isoformat() %}selected{% endif %}>{{ d.isoformat()|fecha_larga }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <label>Misa
+        <select name="misa" required>
+            {% for id, etiqueta in MISAS.items() %}
+            <option value="{{ id }}" {% if datos.misa == id %}selected{% endif %}>{{ etiqueta }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <button type="submit" class="btn-enviar">Guardar</button>
+    <a class="boton-secundario" href="{{ url_for('admin') }}">Cancelar</a>
+</form>
+{% endblock %}

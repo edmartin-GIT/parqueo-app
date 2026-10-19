@@ -1,0 +1,9 @@
+.git
+__pycache__/
+*.pyc
+.venv/
+venv/
+rifa.db
+*.xlsx
+deploy/
+.claude/

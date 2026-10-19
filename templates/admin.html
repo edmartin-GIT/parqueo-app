@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Administrar - Turnos de Parqueo La Guadalupe{% endblock %}
+{% block content %}
+<div class="admin-barra">
+    <h2>Administrar registros</h2>
+    <div class="admin-acciones">
+        <a class="nav-btn btn-verde" href="{{ url_for('admin_nuevo') }}">Añadir servidor</a>
+        <a class="nav-btn btn-negro" href="{{ url_for('admin_exportar') }}">Exportar a Excel</a>
+        <form method="post" action="{{ url_for('admin_salir') }}">
+            <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+            <button type="submit" class="nav-btn btn-gris">Salir</button>
+        </form>
+    </div>
+</div>
+
+<form method="get" class="filtro">
+    <label>Domingo
+        <select name="fecha" onchange="this.form.submit()">
+            <option value="">Todos</option>
+            {% for f in fechas %}
+            <option value="{{ f }}" {% if f == filtro %}selected{% endif %}>{{ f|fecha_larga }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <noscript><button type="submit">Filtrar</button></noscript>
+</form>
+
+<div class="tabla-wrap">
+<table class="tabla-principal">
+    <thead>
+        <tr><th>Domingo</th><th>Misa</th><th>Nombre</th><th>Apellido</th><th>Celular</th><th>Acciones</th></tr>
+    </thead>
+    <tbody>
+    {% for r in filas %}
+        <tr>
+            <td data-label="Domingo">{{ r.fecha|fecha_corta }}</td>
+            <td data-label="Misa">{{ MISAS[r.misa] }}</td>
+            <td data-label="Nombre">{{ r.nombre }}</td>
+            <td data-label="Apellido">{{ r.apellido }}</td>
+            <td data-label="Celular">{{ r.celular }}</td>
+            <td class="acciones" data-label="Acciones">
+                <a href="{{ url_for('admin_editar', id=r.id) }}">Modificar</a>
+                <form method="post" action="{{ url_for('admin_eliminar', id=r.id) }}" onsubmit="return confirm('Eliminar este registro?');">
+                    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+                    <input type="hidden" name="fecha" value="{{ filtro }}">
+                    <button type="submit">Borrar</button>
+                </form>
+            </td>
+        </tr>
+    {% else %}
+        <tr><td colspan="6">No hay registros para este filtro.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

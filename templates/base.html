@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Turnos de Parqueo - La Guadalupe Doral{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="topbar">
+        <div class="topbar-brand">
+            <img src="{{ url_for('static', filename='img/guadalupe.png') }}" alt="Our Lady of Guadalupe Catholic Church" class="logo">
+            <h1 class="topbar-title"><a href="{{ url_for('index') }}">TURNOS DE PARQUEO<br><span>Misas dominicales · La Guadalupe, Doral</span></a></h1>
+        </div>
+        <nav class="nav-buttons">
+            <a class="nav-btn btn-rojo" href="{{ url_for('index') }}">Registrarme</a>
+            <a class="nav-btn btn-verde" href="{{ url_for('turnos') }}">Turnos por domingo</a>
+            {% if es_admin() %}
+            <a class="nav-btn btn-negro" href="{{ url_for('admin') }}">Administrar</a>
+            {% else %}
+            <a class="nav-btn btn-gris" href="{{ url_for('admin_login') }}">Administrador</a>
+            {% endif %}
+        </nav>
+    </header>
+
+    <main class="container">
+        {% with mensajes = get_flashed_messages(with_categories=true) %}
+            {% if mensajes %}
+                <div class="flashes" role="status">
+                    {% for categoria, mensaje in mensajes %}
+                        <div class="flash flash-{{ categoria }}">{{ mensaje }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

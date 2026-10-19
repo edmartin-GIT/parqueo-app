@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Registro de servidores - Turnos de Parqueo La Guadalupe{% endblock %}
+{% block content %}
+
+<p class="intro">Elige tu horario de misa, marca en el calendario los domingos en que puedes servir y registra tus datos.
+Cada misa tiene un maximo de {{ CUPO }} servidores. Puedes inscribirte hasta con 3 meses de anticipacion.</p>
+
+<form method="post" action="{{ url_for('registrar') }}" class="registro" id="registro">
+    <section class="formulario">
+        <h2>Tus datos</h2>
+        <div class="fila-dos">
+            <label>Nombre
+                <input type="text" name="nombre" value="{{ datos.nombre or '' }}" autocomplete="given-name" maxlength="60" required>
+            </label>
+            <label>Apellido
+                <input type="text" name="apellido" value="{{ datos.apellido or '' }}" autocomplete="family-name" maxlength="60" required>
+            </label>
+        </div>
+        <label>Numero de celular
+            <input type="tel" name="celular" id="celular" value="{{ datos.celular or '' }}" inputmode="tel"
+                   autocomplete="tel" placeholder="(305) 555-0123" required>
+        </label>
+
+        <fieldset class="misas">
+            <legend>Horario de misa</legend>
+            {% for id, etiqueta in MISAS.items() %}
+            <label class="misa-op">
+                <input type="radio" name="misa" value="{{ id }}" {% if datos.misa == id %}checked{% endif %}>
+                <span>{{ etiqueta }}</span>
+            </label>
+            {% endfor %}
+        </fieldset>
+
+        <p class="ayuda">Despues elige los domingos en el calendario.</p>
+        <p id="resumen-fechas" class="ayuda" aria-live="polite"></p>
+        <button type="submit" class="btn-enviar">Registrarme</button>
+    </section>
+
+    <section class="calendario">
+        <h2>Domingos disponibles</h2>
+        <div class="meses-tabs">
+            {% for m in meses %}
+            <button type="button" class="mes-tab" data-mes="{{ loop.index0 }}">{{ m.etiqueta }}</button>
+            {% endfor %}
+        </div>
+        {% for m in meses %}
+        <div class="mes" data-mes="{{ loop.index0 }}" {% if not loop.first %}hidden{% endif %}>
+            <div class="cal">
+                {% for d in ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"] %}
+                <div class="dow {% if loop.first %}dom{% endif %}">{{ d }}</div>
+                {% endfor %}
+                {% for semana in m.semanas %}{% for c in semana %}
+                    {% if c is none %}
+                    <div class="dia vacio"></div>
+                    {% elif c.domingo %}
+                    <label class="dia domingo">
+                        <input type="checkbox" name="fechas" value="{{ c.fecha }}"
+                               {% for k, n in c.cuentas.items() %}data-c{{ k }}="{{ n }}" {% endfor %}
+                               {% if c.fecha in seleccionadas %}checked{% endif %}>
+                        <span class="n">{{ c.dia }}</span>
+                        <span class="c"></span>
+                    </label>
+                    {% else %}
+                    <div class="dia otro">{{ c.dia }}</div>
+                    {% endif %}
+                {% endfor %}{% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+        <div class="leyenda">
+            <span><i class="lg-disp"></i>Disponible (ocupados/{{ CUPO }})</span>
+            <span><i class="lg-sel"></i>Elegido</span>
+            <span><i class="lg-lleno"></i>Lleno</span>
+        </div>
+        <p class="ayuda" id="calendario-nota"></p>
+    </section>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    var form = document.getElementById('registro');
+    var cel = document.getElementById('celular');
+    var CUPO = {{ CUPO }};
+    var etiquetas = {{ MISAS|tojson }};
+
+    cel.addEventListener('input', function () {
+        var d = cel.value.replace(/\D/g, '').slice(0, 10);
+        cel.value = d.length < 4 ? d : d.length < 7 ? '(' + d.slice(0, 3) + ') ' + d.slice(3)
+            : '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6);
+    });
+
+    function misaActual() {
+        var r = form.querySelector('input[name="misa"]:checked');
+        return r ? r.value : null;
+    }
+    function refrescar() {
+        var misa = misaActual();
+        form.querySelectorAll('input[name="fechas"]').forEach(function (cb) {
+            var n = misa ? parseInt(cb.getAttribute('data-c' + misa), 10) : 0;
+            var lleno = misa && n >= CUPO;
+            cb.disabled = lleno && !cb.checked;
+            var lab = cb.closest('label');
+            lab.classList.toggle('lleno', !!lleno);
+            lab.querySelector('.c').textContent = !misa ? '' : (lleno ? 'Lleno' : n + '/' + CUPO);
+        });
+        document.getElementById('calendario-nota').textContent = misa
+            ? 'Cupos mostrados para la misa de ' + etiquetas[misa] + '.'
+            : 'Elige un horario de misa para ver los cupos.';
+        var sel = form.querySelectorAll('input[name="fechas"]:checked').length;
+        document.getElementById('resumen-fechas').textContent = sel
+            ? 'Domingos elegidos: ' + sel : 'Aun no has elegido domingos.';
+    }
+    form.addEventListener('change', refrescar);
+    refrescar();
+
+    var tabs = document.querySelectorAll('.mes-tab');
+    function mostrarMes(i) {
+        document.querySelectorAll('.mes').forEach(function (m) { m.hidden = m.getAttribute('data-mes') !== String(i); });
+        tabs.forEach(function (t) { t.classList.toggle('activo', t.getAttribute('data-mes') === String(i)); });
+    }
+    tabs.forEach(function (t) { t.addEventListener('click', function () { mostrarMes(t.getAttribute('data-mes')); }); });
+    mostrarMes(0);
+})();
+</script>
+{% endblock %}

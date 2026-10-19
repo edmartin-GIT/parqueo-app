@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Turnos por domingo - Turnos de Parqueo La Guadalupe{% endblock %}
+{% block content %}
+<h2>Turnos por domingo</h2>
+{% for d in domingos %}
+<section class="domingo-card">
+    <h3>{{ d.fecha|fecha_larga }}</h3>
+    <div class="slots">
+        {% for m in d.misas %}
+        <div class="slot">
+            <h4><span>{{ m.etiqueta }}</span>
+                <span class="cnt {% if m.nombres|length >= CUPO %}lleno{% endif %}">{{ m.nombres|length }}/{{ CUPO }}</span></h4>
+            {% if m.nombres %}
+            <ul>{% for n in m.nombres %}<li>{{ n }}</li>{% endfor %}</ul>
+            {% else %}
+            <p class="vacio-txt">Sin servidores todavia</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endfor %}
+{% endblock %}
