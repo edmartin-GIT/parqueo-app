@@ -169,3 +169,16 @@ fieldset.especiales legend { font-size: 14px; color: #444; padding: 0; margin-bo
 .fila-pasada { opacity: .55; }
 .slots { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 @media (max-width: 720px) { .slots { grid-template-columns: minmax(0, 1fr); } }
+
+/* Clave de registro, aviso y pie legal */
+.intro strong { color: #c0392b; }
+dialog#dlg-clave { border: 0; border-radius: 10px; padding: 22px; width: min(92vw, 380px); box-shadow: 0 10px 40px rgba(0,0,0,.35); }
+dialog#dlg-clave::backdrop { background: rgba(15, 25, 40, .55); }
+dialog#dlg-clave h3 { margin: 0 0 6px; }
+dialog#dlg-clave input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; margin: 10px 0 14px; }
+.dlg-botones { display: flex; gap: 10px; align-items: center; }
+.dlg-botones .btn-enviar { flex: 1; }
+.clave-actual { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
+.btn-peligro { background: transparent; color: #c0392b; border: 1px solid #c0392b; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 15px; font-family: inherit; }
+.legal { max-width: 1200px; margin: 40px auto 24px; padding: 0 16px; font-size: 10px; line-height: 1.5; color: #b3bac1; text-align: center; }
+.legal strong { font-weight: 600; }

@@ -67,6 +67,10 @@ def init_db():
             creado TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(fecha, misa, celular)
         );
+        CREATE TABLE IF NOT EXISTS config (
+            clave TEXT PRIMARY KEY,
+            valor TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS misas_especiales (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             fecha TEXT NOT NULL,

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Clave de registro - Turnos de Parqueo La Guadalupe{% endblock %}
+{% block content %}
+<div class="admin-barra">
+    <h2>Clave de registro</h2>
+    <div class="admin-acciones">
+        <a class="nav-btn btn-gris" href="{{ url_for('admin') }}">Volver a registros</a>
+    </div>
+</div>
+<p class="ayuda" style="margin-bottom:14px">Al pulsar "Registrarme", el servidor debe escribir esta clave. Compártela solo con los servidores del ministerio. No distingue mayúsculas de minúsculas.</p>
+
+<form method="post" class="formulario angosto">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <p class="clave-actual">
+        {% if clave %}Clave actual: <strong>{{ clave }}</strong>
+        {% else %}<strong>No hay clave.</strong> El registro está abierto para cualquiera que tenga el enlace.{% endif %}
+    </p>
+    <label>{% if clave %}Nueva clave{% else %}Crear clave{% endif %}
+        <input type="text" name="clave" minlength="4" maxlength="40" autocomplete="off" required>
+    </label>
+    <button type="submit" class="btn-enviar">Guardar clave</button>
+</form>
+
+{% if clave %}
+<form method="post" class="formulario angosto" style="margin-top:16px">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <input type="hidden" name="accion" value="quitar">
+    <p class="ayuda">Si quitas la clave, cualquiera con el enlace podrá registrarse.</p>
+    <button type="submit" class="btn-peligro" onclick="return confirm('Quitar la clave y dejar el registro abierto?');">Quitar clave</button>
+</form>
+{% endif %}
+{% endblock %}

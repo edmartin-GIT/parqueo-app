@@ -3,7 +3,8 @@
 {% block content %}
 
 <p class="intro">Elige tu horario de misa, marca en el calendario los domingos en que puedes servir y registra tus datos.
-Cada misa tiene un maximo de {{ CUPO }} servidores. Puedes inscribirte hasta con 3 meses de anticipacion.</p>
+Cada misa tiene un máximo de {{ CUPO }} servidores. Puedes inscribirte hasta con 3 meses de anticipación.
+<strong>IMPORTANTE: debes llegar con 30 minutos de anticipación al turno seleccionado, es decir 10:00 AM, 1:00 PM y 6:30 PM.</strong></p>
 
 <form method="post" action="{{ url_for('registrar') }}" class="registro" id="registro">
     <section class="formulario">
@@ -90,6 +91,24 @@ Cada misa tiene un maximo de {{ CUPO }} servidores. Puedes inscribirte hasta con
         <p class="ayuda" id="calendario-nota"></p>
     </section>
 </form>
+
+<dialog id="dlg-clave" aria-labelledby="dlg-titulo">
+    <h3 id="dlg-titulo">Clave de registro</h3>
+    <p class="ayuda">Escribe la clave que te dio el coordinador del ministerio para confirmar tu registro.</p>
+    <input type="password" id="clave-input" name="clave_acceso" form="registro" autocomplete="off" aria-label="Clave de registro">
+    <div class="dlg-botones">
+        <button type="button" class="btn-enviar" id="clave-ok">Confirmar</button>
+        <button type="button" class="boton-secundario" id="clave-cancel">Cancelar</button>
+    </div>
+</dialog>
+{% endblock %}
+
+{% block footer %}
+<footer class="legal">
+    <strong>Curiosity Logic LLC</strong><br>
+    Todos los derechos reservados. El contenido, las marcas registradas, los logotipos y la propiedad intelectual mostrados en este sitio web están protegidos por las leyes de derechos de autor y marcas aplicables. Queda estrictamente prohibida su uso, reproducción o distribución no autorizada.<br>
+    Contacto: info@curiositylogic.com
+</footer>
 {% endblock %}
 
 {% block scripts %}
@@ -127,6 +146,24 @@ Cada misa tiene un maximo de {{ CUPO }} servidores. Puedes inscribirte hasta con
         document.getElementById('resumen-fechas').textContent = sel
             ? 'Turnos elegidos: ' + sel : 'Aun no has elegido turnos.';
     }
+
+    var REQUIERE_CLAVE = {{ 'true' if requiere_clave else 'false' }};
+    var dlg = document.getElementById('dlg-clave');
+    var claveInput = document.getElementById('clave-input');
+    form.addEventListener('submit', function (e) {
+        if (REQUIERE_CLAVE && !claveInput.value.trim()) {
+            e.preventDefault();
+            if (dlg.showModal) { dlg.showModal(); claveInput.focus(); }
+        }
+    });
+    function confirmarClave() {
+        if (!claveInput.value.trim()) { claveInput.focus(); return; }
+        dlg.close();
+        form.submit();
+    }
+    document.getElementById('clave-ok').addEventListener('click', confirmarClave);
+    document.getElementById('clave-cancel').addEventListener('click', function () { claveInput.value = ''; dlg.close(); });
+    claveInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); confirmarClave(); } });
     form.addEventListener('change', refrescar);
     refrescar();
 

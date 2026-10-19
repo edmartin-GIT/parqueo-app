@@ -4,6 +4,7 @@ import os
 import re
 import secrets
 import sqlite3
+import time
 from datetime import date, datetime, timedelta
 from functools import wraps
 from io import BytesIO
@@ -15,12 +16,15 @@ from flask import (
     session, url_for,
 )
 from openpyxl.styles import Font
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from db import CUPO_MAXIMO, DB_PATH, MESES_ADELANTE, MISAS, get_conn, init_db
 
 ZONA = ZoneInfo("America/New_York")
 
 app = Flask(__name__)
+# Detras de Traefik: usar la IP real del cliente y el esquema https.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 
 def _clave_secreta():
@@ -209,6 +213,43 @@ def requiere_admin(f):
     return envoltura
 
 
+# ---------- Clave de registro ----------
+
+MAX_INTENTOS = 8
+VENTANA_SEG = 600
+_intentos = {}
+
+
+def clave_registro(conn=None):
+    cerrar = conn is None
+    conn = conn or get_conn()
+    fila = conn.execute("SELECT valor FROM config WHERE clave='clave_registro'").fetchone()
+    if cerrar:
+        conn.close()
+    return fila["valor"] if fila else ""
+
+
+def _recientes():
+    ahora = time.time()
+    lista = [t for t in _intentos.get(request.remote_addr, []) if ahora - t < VENTANA_SEG]
+    _intentos[request.remote_addr] = lista
+    return lista
+
+
+def bloqueado_por_intentos():
+    return len(_recientes()) >= MAX_INTENTOS
+
+
+def registrar_intento_fallido():
+    _recientes().append(time.time())
+
+
+def clave_correcta(enviada, esperada):
+    a = (enviada or "").strip().casefold().encode()
+    b = esperada.strip().casefold().encode()
+    return hmac.compare_digest(a, b)
+
+
 # ---------- Publico ----------
 
 def construir_meses(cuentas, domingos, fechas_especiales):
@@ -260,6 +301,7 @@ def pagina_registro(datos=None, seleccionadas=(), especiales_sel=()):
         datos=datos or {"misa": "1030"},
         seleccionadas=set(seleccionadas),
         especiales_sel={str(x) for x in especiales_sel},
+        requiere_clave=bool(clave_registro()),
         titulo_pagina="Registro de servidores",
     )
 
@@ -298,6 +340,16 @@ def registrar():
         for e in errores:
             flash(e, "error")
         return pagina_registro(datos, fechas, ids_especiales)
+
+    esperada = clave_registro()
+    if esperada:
+        if bloqueado_por_intentos():
+            flash("Demasiados intentos con clave incorrecta. Espera unos minutos e inténtalo de nuevo.", "error")
+            return pagina_registro(datos, fechas, ids_especiales)
+        if not clave_correcta(request.form.get("clave_acceso"), esperada):
+            registrar_intento_fallido()
+            flash("La clave de registro no es correcta. Pídela al coordinador del ministerio.", "error")
+            return pagina_registro(datos, fechas, ids_especiales)
 
     conn = get_conn()
     especiales = {e["id"]: e for e in especiales_en_ventana(conn)}
@@ -539,6 +591,34 @@ def admin_eliminar(id):
     conn.close()
     flash("Registro eliminado.", "success")
     return redirect(url_for("admin", fecha=request.form.get("fecha", "")))
+
+
+# ---------- Administrador: clave de registro ----------
+
+@app.route("/admin/clave", methods=["GET", "POST"])
+@requiere_admin
+def admin_clave():
+    if request.method == "POST":
+        nueva = request.form.get("clave", "").strip()
+        conn = get_conn()
+        if request.form.get("accion") == "quitar":
+            conn.execute("DELETE FROM config WHERE clave='clave_registro'")
+            conn.commit()
+            conn.close()
+            flash("Clave eliminada. El registro queda abierto sin clave.", "success")
+            return redirect(url_for("admin_clave"))
+        if not 4 <= len(nueva) <= 40:
+            conn.close()
+            flash("La clave debe tener entre 4 y 40 caracteres.", "error")
+            return redirect(url_for("admin_clave"))
+        conn.execute(
+            "INSERT INTO config (clave, valor) VALUES ('clave_registro', ?) "
+            "ON CONFLICT(clave) DO UPDATE SET valor=excluded.valor", (nueva,))
+        conn.commit()
+        conn.close()
+        flash("Clave de registro guardada. Compártela con los servidores.", "success")
+        return redirect(url_for("admin_clave"))
+    return render_template("admin_clave.html", clave=clave_registro(), titulo_pagina="Clave de registro")
 
 
 # ---------- Administrador: misas especiales ----------

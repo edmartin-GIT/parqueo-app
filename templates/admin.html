@@ -6,6 +6,7 @@
     <div class="admin-acciones">
         <a class="nav-btn btn-verde" href="{{ url_for('admin_nuevo') }}">Añadir servidor</a>
         <a class="nav-btn btn-rojo" href="{{ url_for('admin_especiales') }}">Misas especiales</a>
+        <a class="nav-btn btn-gris" href="{{ url_for('admin_clave') }}">Clave de registro</a>
         <a class="nav-btn btn-negro" href="{{ url_for('admin_exportar') }}">Exportar a Excel</a>
         <form method="post" action="{{ url_for('admin_salir') }}">
             <input type="hidden" name="csrf" value="{{ csrf_token() }}">
