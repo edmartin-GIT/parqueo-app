@@ -195,7 +195,7 @@ dialog#dlg-clave input { width: 100%; padding: 10px; border: 1px solid #ccc; bor
 @media (max-width: 480px) { .logistica { padding: 16px; } }
 
 /* Botones bloqueados y galeria */
-.btn-bloqueado { background: #cfd5da; color: #7b858d; box-shadow: none; cursor: not-allowed; }
+.btn-bloqueado { background: #cfd5da; color: #6f7a83; box-shadow: none; cursor: not-allowed; opacity: .85; }
 .btn-bloqueado:hover { background: #cfd5da; }
 .galeria { display: grid; grid-template-columns: 1.78fr 0.75fr; gap: 12px; margin: 0 0 20px; align-items: start; }
 .galeria img { display: block; width: 100%; height: auto; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
