@@ -200,3 +200,4 @@ dialog#dlg-clave input { width: 100%; padding: 10px; border: 1px solid #ccc; bor
 .galeria { display: grid; grid-template-columns: 1.78fr 0.75fr; gap: 12px; margin: 0 0 20px; align-items: start; }
 .galeria img { display: block; width: 100%; height: auto; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
 @media (max-width: 640px) { .galeria { grid-template-columns: minmax(0, 1fr); } .galeria .foto-alta { max-width: 360px; margin: 0 auto; } }
+p.capacidad-total { margin: 14px 0 0; font-size: 17px; }
