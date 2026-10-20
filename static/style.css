@@ -182,3 +182,14 @@ dialog#dlg-clave input { width: 100%; padding: 10px; border: 1px solid #ccc; bor
 .btn-peligro { background: transparent; color: #c0392b; border: 1px solid #c0392b; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 15px; font-family: inherit; }
 .legal { max-width: 1200px; margin: 40px auto 24px; padding: 0 16px; font-size: 10px; line-height: 1.5; color: #b3bac1; text-align: center; }
 .legal strong { font-weight: 600; }
+
+/* Logistica parqueo */
+.btn-verde-claro { background: #a8e6b8; color: #14452a; }
+.btn-verde-claro:hover { background: #8fdba3; }
+.logistica { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 24px; max-width: 860px; margin: 0 auto; }
+.logistica-logo { display: block; max-width: 100%; width: 380px; height: auto; margin: 0 auto 20px; }
+.logistica h2 { margin: 22px 0 8px; font-size: 20px; }
+.logistica ul { margin: 0; padding-left: 22px; line-height: 1.6; }
+.logistica li { margin-bottom: 4px; }
+.logistica-mapa { display: block; max-width: 100%; height: auto; margin: 26px auto 0; border-radius: 6px; border: 1px solid #e5e5e5; }
+@media (max-width: 480px) { .logistica { padding: 16px; } }

@@ -15,6 +15,7 @@
         <nav class="nav-buttons">
             <a class="nav-btn btn-rojo" href="{{ url_for('index') }}">Registrarme</a>
             <a class="nav-btn btn-verde" href="{{ url_for('turnos') }}">Turnos por domingo</a>
+            <a class="nav-btn btn-verde-claro" href="{{ url_for('logistica') }}">Logística Parqueo</a>
             {% if es_admin() %}
             <a class="nav-btn btn-negro" href="{{ url_for('admin') }}">Administrar</a>
             {% else %}

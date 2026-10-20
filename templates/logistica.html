@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Logística Parqueo - Turnos de Parqueo La Guadalupe{% endblock %}
+{% block content %}
+<article class="logistica">
+    <img class="logistica-logo" src="{{ url_for('static', filename='img/logo-guadalupe.jpg') }}"
+         alt="Our Lady of Guadalupe Catholic Church, Archdiocese of Miami">
+
+    <h2>Instrucciones</h2>
+    <ul>
+        <li>Llegar 30 a 45 min antes de cada misa.</li>
+        <li>Primer voluntario o servidor: poner conos necesarios.</li>
+        <li>Primer servidor en el lote 2 (handicap).</li>
+        <li>Segundo servidor: entrada 117.</li>
+        <li>Tercer servidor: lote.</li>
+        <li>Una vez se llene el lote 3, llenar el lote 4 y cerrarlo. Ese voluntario debe ir a ayudar al terreno.</li>
+        <li>De allí en adelante depende de la dinámica y número de servidores de cada turno.</li>
+        <li>En caso de corrección fraterna a un hermano y/o feligrés, o en caso de alguna queja, por favor que estén 2 servidores presentes en lo posible.</li>
+        <li>A la hora de la salida, partir el asfaltado en dos con conos y sacar los carros del asfaltado por la 25 St y los del terreno por la 117 Ave.</li>
+        <li>Una vez llegue el oficial/policía, ubicarlo en la entrada de la 117.</li>
+        <li>Por favor seguir instrucciones del líder de turno, las rutinas pueden variar por turnos.</li>
+    </ul>
+
+    <h2>Uniforme y Radio</h2>
+    <ul>
+        <li>Traer camisa blanca y chaleco gris.</li>
+        <li>Voluntarios extras pueden usar chaleco verde.</li>
+        <li>Traer radio, canal 6.</li>
+        <li>Si quieren, traigan silbato (pito) y/o linterna, especialmente en el turno de las 7:00 PM.</li>
+        <li>Traer gorro y usar bloqueador solar para turnos de día.</li>
+    </ul>
+
+    <img class="logistica-mapa" src="{{ url_for('static', filename='img/mapa-parqueo.jpg') }}"
+         alt="Mapa del estacionamiento: lotes 1 al 4 junto a la iglesia y el terreno rectangular con 7 filas de parqueo, entrada y salida">
+</article>
+{% endblock %}

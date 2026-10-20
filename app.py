@@ -413,6 +413,11 @@ def turnos():
     return render_template("turnos.html", domingos=domingos, titulo_pagina="Turnos por domingo")
 
 
+@app.route("/logistica")
+def logistica():
+    return render_template("logistica.html", titulo_pagina="Logística Parqueo")
+
+
 # ---------- Administrador ----------
 
 @app.route("/admin/login", methods=["GET", "POST"])
