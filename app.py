@@ -1,4 +1,5 @@
 import calendar
+import hashlib
 import hmac
 import os
 import re
@@ -42,7 +43,7 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=os.environ.get("COOKIE_SECURE", "0") == "1",
-    PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
 )
 
 
@@ -183,8 +184,32 @@ def limpiar_texto(valor, largo=60):
     return re.sub(r"\s+", " ", (valor or "").strip())[:largo]
 
 
+ADMIN_HORAS = 8
+
+
 def es_admin():
-    return session.get("admin") is True
+    return time.time() - session.get("admin_ts", 0) < ADMIN_HORAS * 3600
+
+
+def _huella_clave(clave):
+    return hashlib.sha256(("parqueo:" + clave.strip().casefold()).encode()).hexdigest()[:20]
+
+
+def acceso_servidor():
+    """True si el visitante ya ingreso la clave de registro (o no hay clave, o es administrador)."""
+    if es_admin():
+        return True
+    esperada = clave_registro()
+    if not esperada:
+        return True
+    return session.get("clave_ok") == _huella_clave(esperada)
+
+
+def desbloquear():
+    esperada = clave_registro()
+    if esperada:
+        session["clave_ok"] = _huella_clave(esperada)
+        session.permanent = True
 
 
 def token_csrf():
@@ -195,6 +220,7 @@ def token_csrf():
 
 app.jinja_env.globals["csrf_token"] = token_csrf
 app.jinja_env.globals["es_admin"] = es_admin
+app.jinja_env.globals["acceso_servidor"] = acceso_servidor
 app.jinja_env.globals["MISAS"] = MISAS
 app.jinja_env.globals["CUPO"] = CUPO_MAXIMO
 
@@ -350,6 +376,7 @@ def registrar():
             registrar_intento_fallido()
             flash("La clave de registro no es correcta. Pídela al coordinador del ministerio.", "error")
             return pagina_registro(datos, fechas, ids_especiales)
+        desbloquear()
 
     conn = get_conn()
     especiales = {e["id"]: e for e in especiales_en_ventana(conn)}
@@ -386,8 +413,35 @@ def registrar():
     return redirect(url_for("index"))
 
 
+def exigir_acceso_servidor():
+    if acceso_servidor():
+        return None
+    flash("Ingresa la clave de registro para ver esta sección.", "error")
+    return redirect(url_for("index"))
+
+
+@app.route("/desbloquear", methods=["POST"])
+def desbloquear_ruta():
+    destino = {"turnos": "turnos", "logistica": "logistica"}.get(request.form.get("destino", ""), "index")
+    esperada = clave_registro()
+    if esperada:
+        if bloqueado_por_intentos():
+            flash("Demasiados intentos con clave incorrecta. Espera unos minutos e inténtalo de nuevo.", "error")
+            return redirect(url_for("index"))
+        if not clave_correcta(request.form.get("clave_acceso"), esperada):
+            registrar_intento_fallido()
+            flash("La clave de registro no es correcta. Pídela al coordinador del ministerio.", "error")
+            return redirect(url_for("index"))
+        desbloquear()
+    flash("Acceso habilitado.", "success")
+    return redirect(url_for(destino))
+
+
 @app.route("/turnos")
 def turnos():
+    bloqueo = exigir_acceso_servidor()
+    if bloqueo:
+        return bloqueo
     conn = get_conn()
     filas = conn.execute(
         "SELECT fecha, misa, nombre, apellido FROM registros ORDER BY fecha, misa, creado, id"
@@ -415,6 +469,9 @@ def turnos():
 
 @app.route("/logistica")
 def logistica():
+    bloqueo = exigir_acceso_servidor()
+    if bloqueo:
+        return bloqueo
     return render_template("logistica.html", titulo_pagina="Logística Parqueo")
 
 
@@ -427,8 +484,8 @@ def admin_login():
         if not clave:
             flash("El acceso de administrador no esta configurado en el servidor.", "error")
         elif hmac.compare_digest(request.form.get("password", ""), clave):
-            session.clear()
-            session["admin"] = True
+            session.pop("csrf", None)
+            session["admin_ts"] = time.time()
             session.permanent = True
             return redirect(url_for("admin"))
         else:
@@ -439,7 +496,8 @@ def admin_login():
 @app.route("/admin/salir", methods=["POST"])
 @requiere_admin
 def admin_salir():
-    session.clear()
+    session.pop("admin_ts", None)
+    session.pop("csrf", None)
     return redirect(url_for("index"))
 
 

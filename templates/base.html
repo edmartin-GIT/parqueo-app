@@ -14,8 +14,13 @@
         </div>
         <nav class="nav-buttons">
             <a class="nav-btn btn-rojo" href="{{ url_for('index') }}">Registrarme</a>
+            {% if acceso_servidor() %}
             <a class="nav-btn btn-verde" href="{{ url_for('turnos') }}">Turnos por domingo</a>
             <a class="nav-btn btn-verde-claro" href="{{ url_for('logistica') }}">Logística Parqueo</a>
+            {% else %}
+            <a class="nav-btn btn-bloqueado" href="{{ url_for('index') }}" aria-disabled="true" data-bloqueado data-destino="turnos" title="Ingresa la clave de registro para habilitar">Turnos por domingo</a>
+            <a class="nav-btn btn-bloqueado" href="{{ url_for('index') }}" aria-disabled="true" data-bloqueado data-destino="logistica" title="Ingresa la clave de registro para habilitar">Logística Parqueo</a>
+            {% endif %}
             {% if es_admin() %}
             <a class="nav-btn btn-negro" href="{{ url_for('admin') }}">Administrar</a>
             {% else %}
@@ -37,6 +42,36 @@
 
         {% block content %}{% endblock %}
     </main>
+
+    {% if not acceso_servidor() %}
+    <dialog id="dlg-desbloqueo" aria-labelledby="desb-titulo">
+        <form method="post" action="{{ url_for('desbloquear_ruta') }}">
+            <h3 id="desb-titulo">Clave de registro</h3>
+            <p class="ayuda">Escribe la clave que te dio el coordinador del ministerio para habilitar esta sección.</p>
+            <input type="password" id="desb-clave" name="clave_acceso" autocomplete="off" aria-label="Clave de registro" required>
+            <input type="hidden" name="destino" id="desb-destino" value="">
+            <div class="dlg-botones">
+                <button type="submit" class="btn-enviar">Habilitar</button>
+                <button type="button" class="boton-secundario" id="desb-cancel">Cancelar</button>
+            </div>
+        </form>
+    </dialog>
+    <script>
+    (function () {
+        var dlg = document.getElementById('dlg-desbloqueo');
+        if (!dlg || !dlg.showModal) { return; }
+        document.querySelectorAll('[data-bloqueado]').forEach(function (a) {
+            a.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.getElementById('desb-destino').value = a.getAttribute('data-destino');
+                dlg.showModal();
+                document.getElementById('desb-clave').focus();
+            });
+        });
+        document.getElementById('desb-cancel').addEventListener('click', function () { dlg.close(); });
+    })();
+    </script>
+    {% endif %}
     {% block footer %}{% endblock %}
     {% block scripts %}{% endblock %}
 </body>

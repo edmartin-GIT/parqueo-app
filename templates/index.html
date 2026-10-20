@@ -6,6 +6,13 @@
 Cada misa tiene un mínimo de {{ CUPO }} servidores. Puedes inscribirte hasta con 3 meses de anticipación.
 <strong>IMPORTANTE: debes llegar con 30 minutos de anticipación al turno seleccionado, es decir 10:00 AM, 1:00 PM y 6:30 PM.</strong></p>
 
+<div class="galeria">
+    <img src="{{ url_for('static', filename='img/servidores-noche.jpg') }}" class="foto-ancha" width="2000" height="1125"
+         alt="Servidores de parqueo con chalecos amarillos y bastones luminosos en el turno de la noche">
+    <img src="{{ url_for('static', filename='img/servidores-altar.jpg') }}" class="foto-alta" width="1200" height="1600"
+         alt="Servidores de parqueo con chalecos grises frente al altar de la iglesia">
+</div>
+
 <form method="post" action="{{ url_for('registrar') }}" class="registro" id="registro">
     <section class="formulario">
         <h2>Tus datos</h2>
