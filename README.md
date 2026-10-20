@@ -1,6 +1,6 @@
 # Turnos de Parqueo - La Guadalupe Doral
 
-Sitio web publico para que los servidores se inscriban a los turnos de parqueo de las misas dominicales (10:30 AM, 1:30 PM y 7:00 PM). Maximo 8 servidores por misa y calendario con los domingos de los proximos 3 meses.
+Sitio web publico para que los servidores se inscriban a los turnos de parqueo de las misas dominicales (10:00 AM, 1:30 PM y 7:00 PM). Maximo 8 servidores por misa y calendario con los domingos de los proximos 3 meses.
 
 - **Publico** (cualquiera con el enlace): registro con nombre, apellido, celular y horario de misa; calendario para marcar los domingos; lista de turnos por domingo (sin celulares).
 - **Administrador** (`/admin`, protegido con contraseña): ver, añadir, modificar y borrar registros, y exportar a Excel.

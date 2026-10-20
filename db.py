@@ -10,7 +10,7 @@ MESES_ADELANTE = 3
 
 # Misas dominicales fijas. Las misas especiales usan la clave "E<id>".
 MISAS = {
-    "1030": "10:30 AM",
+    "1030": "10:00 AM",  # la clave "1030" se conserva para no tocar los registros ya guardados
     "1330": "1:30 PM",
     "1900": "7:00 PM",
 }
