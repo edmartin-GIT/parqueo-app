@@ -1,6 +1,6 @@
 # Turnos de Parqueo - La Guadalupe Doral
 
-Sitio web publico para que los servidores se inscriban a los turnos de parqueo de las misas dominicales (10:00 AM, 1:30 PM y 7:00 PM). Maximo 8 servidores por misa y calendario con los domingos de los proximos 3 meses.
+Sitio web publico para que los servidores se inscriban a los turnos de parqueo de las misas dominicales (10:00 AM, 1:30 PM y 7:00 PM). Maximo 12 servidores por misa y calendario con los domingos de los proximos 3 meses.
 
 - **Publico** (cualquiera con el enlace): registro con nombre, apellido, celular y horario de misa; calendario para marcar los domingos; lista de turnos por domingo (sin celulares).
 - **Administrador** (`/admin`, protegido con contraseña): ver, añadir, modificar y borrar registros, y exportar a Excel.
@@ -16,7 +16,7 @@ Queda en `http://localhost:5002`. La base SQLite (`parqueo.db`) se crea sola en 
 
 ## Estructura
 
-- `app.py` - rutas y logica (Flask). El cupo de 8 se verifica dentro de una transaccion SQLite, asi dos personas no pueden tomar el ultimo lugar a la vez.
+- `app.py` - rutas y logica (Flask). El cupo de 12 se verifica dentro de una transaccion SQLite, asi dos personas no pueden tomar el ultimo lugar a la vez.
 - `db.py` - base SQLite, horarios de misa, cupo y meses de anticipacion. Respeta `PARQUEO_DB_PATH`.
 - `templates/`, `static/` - vistas y CSS.
 - `Dockerfile` - imagen de produccion (Gunicorn, puerto 8000).
@@ -49,14 +49,14 @@ Igual que `rifa-app`: un servicio mas en `/root/docker-compose.yml`.
          - parqueo_data:/app/data
        labels:
          - traefik.enable=true
-         - traefik.http.routers.parqueo-app.rule=Host(`parqueo.curiositylogic.cloud`)
+         - traefik.http.routers.parqueo-app.rule=Host(`parqueo.guadalupedoral.app`)
          - traefik.http.routers.parqueo-app.tls=true
          - traefik.http.routers.parqueo-app.entrypoints=web,websecure
          - traefik.http.routers.parqueo-app.tls.certresolver=mytlschallenge
          - traefik.http.services.parqueo-app.loadbalancer.server.port=8000
    ```
    Agregar `parqueo_data:` a la seccion `volumes:` y definir `PARQUEO_ADMIN_PASSWORD=...` en `/root/.env`.
-3. Crear el registro DNS tipo A: `parqueo.curiositylogic.cloud` -> IP del VPS.
+3. Crear el registro DNS tipo A: `parqueo.guadalupedoral.app` -> IP del VPS.
 4. Levantar:
    ```bash
    cd /root && docker compose up -d --build parqueo-app

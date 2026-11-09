@@ -5,7 +5,7 @@ from pathlib import Path
 DB_PATH = Path(os.environ.get("PARQUEO_DB_PATH", Path(__file__).parent / "parqueo.db"))
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-CUPO_MAXIMO = 8
+CUPO_MAXIMO = 12
 MESES_ADELANTE = 3
 
 # Misas dominicales fijas. Las misas especiales usan la clave "E<id>".
@@ -76,7 +76,7 @@ def init_db():
             fecha TEXT NOT NULL,
             hora TEXT NOT NULL,
             descripcion TEXT NOT NULL DEFAULT '',
-            cupo INTEGER NOT NULL DEFAULT 8 CHECK(cupo BETWEEN 1 AND 50)
+            cupo INTEGER NOT NULL DEFAULT 12 CHECK(cupo BETWEEN 1 AND 50)
         );
         """
     )

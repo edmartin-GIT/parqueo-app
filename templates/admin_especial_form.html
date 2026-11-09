@@ -15,7 +15,7 @@
                placeholder="Ej: Fiesta de Nuestra Señora de Guadalupe">
     </label>
     <label>Cupo de servidores
-        <input type="number" name="cupo" value="{{ datos.cupo or 8 }}" min="1" max="50" required>
+        <input type="number" name="cupo" value="{{ datos.cupo or CUPO }}" min="1" max="50" required>
     </label>
     <p class="ayuda">Las fechas disponibles van desde hoy hasta {{ maximo|fecha_larga }}.</p>
     <button type="submit" class="btn-enviar">Guardar</button>
