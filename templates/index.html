@@ -99,6 +99,46 @@ Cada misa tiene un mínimo de {{ CUPO }} servidores. Puedes inscribirte hasta co
     </section>
 </form>
 
+<section class="ranking" id="ranking">
+    <div class="ranking-cab">
+        <h2>Reto del parqueo: ranking de servidores</h2>
+        <p class="ayuda">Estrellas acumuladas hasta el {{ hoy_iso|fecha_larga }}. Se actualiza solo.</p>
+    </div>
+    {% if ranking %}
+    <div class="tabla-wrap">
+    <table class="tabla-ranking">
+        <thead>
+            <tr><th>#</th><th>Servidor</th><th class="num">Estrellas</th><th class="num">Servicios</th><th class="num">Faltas</th><th class="num">Bonos</th></tr>
+        </thead>
+        <tbody>
+        {% for x in ranking[:15] %}
+            <tr class="{% if x.posicion <= 3 %}podio podio-{{ x.posicion }}{% endif %}">
+                <td class="pos"><span>{{ x.posicion }}</span></td>
+                <td class="quien">{{ x.publico }}</td>
+                <td class="num est">{{ x.estrellas }} <span class="estrella-g">★</span></td>
+                <td class="num">{{ x.servicios }}</td>
+                <td class="num">{{ x.ausencias }}</td>
+                <td class="num">{% if x.meses_perfectos %}{{ x.meses_perfectos|length }} ×5 ★{% else %}-{% endif %}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% if ranking|length > 15 %}<p class="ayuda">Y {{ ranking|length - 15 }} servidores más participando.</p>{% endif %}
+    {% else %}
+    <p class="ayuda">El ranking aparecerá cuando se complete el primer servicio.</p>
+    {% endif %}
+    <details class="reglas">
+        <summary>¿Cómo se ganan las estrellas?</summary>
+        <ul>
+            <li>Tu primer servicio en el parqueo vale <strong>3 estrellas</strong>.</li>
+            <li>Cada servicio al que asistes: <strong>+1 estrella</strong>.</li>
+            <li>Cada servicio en el que te registras y no asistes: <strong>−1 estrella</strong>.</li>
+            <li>Si asistes a <strong>todos los domingos de un mes</strong>, ganas <strong>+5 estrellas</strong>. Se suman al comenzar el mes siguiente.</li>
+        </ul>
+    </details>
+</section>
+
 <dialog id="dlg-clave" aria-labelledby="dlg-titulo">
     <h3 id="dlg-titulo">Clave de registro</h3>
     <p class="ayuda">Escribe la clave que te dio el coordinador del ministerio para confirmar tu registro.</p>

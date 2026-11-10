@@ -143,11 +143,11 @@ th { background: #eef2f6; }
 .acciones a { background: #2980b9; color: white; padding: 4px 10px; border-radius: 4px; text-decoration: none; }
 
 @media (max-width: 640px) {
-    table, thead, tbody, th, td, tr { display: block; }
-    thead { display: none; }
-    tr { margin-bottom: 12px; border: 1px solid #e5e5e5; border-radius: 6px; padding: 8px; }
-    td { border: none; padding: 4px 6px; }
-    td::before { content: attr(data-label); font-weight: 600; display: inline-block; min-width: 90px; color: #555; }
+    .tabla-principal, .tabla-principal thead, .tabla-principal tbody, .tabla-principal th, .tabla-principal td, .tabla-principal tr { display: block; }
+    .tabla-principal thead { display: none; }
+    .tabla-principal tr { margin-bottom: 12px; border: 1px solid #e5e5e5; border-radius: 6px; padding: 8px; }
+    .tabla-principal td { border: none; padding: 4px 6px; }
+    .tabla-principal td::before { content: attr(data-label); font-weight: 600; display: inline-block; min-width: 90px; color: #555; }
 }
 
 /* Misas especiales */
@@ -201,3 +201,36 @@ dialog#dlg-clave input { width: 100%; padding: 10px; border: 1px solid #ccc; bor
 .galeria img { display: block; width: 100%; height: auto; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
 @media (max-width: 640px) { .galeria { grid-template-columns: minmax(0, 1fr); } .galeria .foto-alta { max-width: 360px; margin: 0 auto; } }
 p.capacidad-total { margin: 14px 0 0; font-size: 17px; }
+
+/* Asistencia (panel admin) */
+.estado { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-bottom: 4px; }
+.estado-ok { background: #d1fae5; color: #065f46; }
+.estado-no { background: #f8d7da; color: #721c24; }
+.estado-pend { background: #eceff1; color: #546e7a; }
+.marcar { display: flex; gap: 4px; flex-wrap: wrap; margin: 0; }
+.marcar button { font: inherit; font-size: 12px; padding: 3px 8px; border: 1px solid #ccc; background: #fafbfc; border-radius: 4px; cursor: pointer; }
+.marcar button:hover { background: #eef2f6; }
+
+/* Ranking */
+.ranking { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 24px; margin-top: 24px; }
+.ranking h2 { margin: 0 0 4px; font-size: 20px; }
+.ranking-cab { margin-bottom: 14px; }
+.tabla-ranking { min-width: 0; margin: 0; box-shadow: none; }
+.tabla-ranking th.num, .tabla-ranking td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tabla-ranking td.pos span { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: #eef2f6; font-weight: 700; font-size: 13px; }
+.tabla-ranking .podio-1 td.pos span { background: #f7d154; }
+.tabla-ranking .podio-2 td.pos span { background: #d5dbe0; }
+.tabla-ranking .podio-3 td.pos span { background: #e3b184; }
+.tabla-ranking .podio td.quien, .tabla-ranking .podio td.est { font-weight: 700; }
+.tabla-ranking td.est { white-space: nowrap; }
+.estrella-g { color: #d4a017; }
+.reglas { margin-top: 14px; font-size: 14px; }
+.reglas summary { cursor: pointer; font-weight: 600; color: #1f3a5f; }
+.reglas ul { margin: 8px 0 0; padding-left: 22px; line-height: 1.6; }
+@media (max-width: 640px) {
+    .ranking { padding: 16px; }
+    .tabla-ranking th, .tabla-ranking td { padding: 8px 6px; font-size: 13px; }
+}
+
+.chk-asist { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
+.chk-asist input { width: 20px; height: 20px; }

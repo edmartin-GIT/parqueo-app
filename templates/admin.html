@@ -30,7 +30,7 @@
 <div class="tabla-wrap">
 <table class="tabla-principal">
     <thead>
-        <tr><th>Fecha</th><th>Misa</th><th>Nombre</th><th>Apellido</th><th>Celular</th><th>Acciones</th></tr>
+        <tr><th>Fecha</th><th>Misa</th><th>Nombre</th><th>Apellido</th><th>Celular</th><th>Asistencia</th><th>Acciones</th></tr>
     </thead>
     <tbody>
     {% for r in filas %}
@@ -40,6 +40,14 @@
             <td data-label="Nombre">{{ r.nombre }}</td>
             <td data-label="Apellido">{{ r.apellido }}</td>
             <td data-label="Celular">{{ r.celular }}</td>
+            <td data-label="Asistencia">
+                <span class="estado estado-{{ 'ok' if r.estado == 'Asistió' else 'no' if r.estado == 'No asistió' else 'pend' }}">{{ r.estado }}</span>
+                <form method="post" action="{{ url_for('admin_asistencia', id=r.id) }}" class="marcar">
+                    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+                    <input type="hidden" name="fecha" value="{{ filtro }}">
+                    <label class="chk-asist"><input type="checkbox" name="asistio" value="1" {% if r.asistio == 1 %}checked{% endif %} onchange="this.form.submit()"> Asistió</label>
+                </form>
+            </td>
             <td class="acciones" data-label="Acciones">
                 <a href="{{ url_for('admin_editar', id=r.id) }}">Modificar</a>
                 <form method="post" action="{{ url_for('admin_eliminar', id=r.id) }}" onsubmit="return confirm('Eliminar este registro?');">
@@ -50,7 +58,7 @@
             </td>
         </tr>
     {% else %}
-        <tr><td colspan="6">No hay registros para este filtro.</td></tr>
+        <tr><td colspan="7">No hay registros para este filtro.</td></tr>
     {% endfor %}
     </tbody>
 </table>

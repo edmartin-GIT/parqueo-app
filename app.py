@@ -20,6 +20,7 @@ from openpyxl.styles import Font
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from db import CUPO_MAXIMO, DB_PATH, MESES_ADELANTE, MISAS, get_conn, init_db
+from ranking import calcular_ranking
 
 ZONA = ZoneInfo("America/New_York")
 
@@ -308,6 +309,15 @@ def construir_meses(cuentas, domingos, fechas_especiales):
     return meses
 
 
+def ranking_actual():
+    conn = get_conn()
+    filas = [dict(r) for r in conn.execute(
+        "SELECT fecha, misa, nombre, apellido, celular, asistio FROM registros WHERE fecha <= ?",
+        (hoy().isoformat(),))]
+    conn.close()
+    return calcular_ranking(filas, hoy())
+
+
 def pagina_registro(datos=None, seleccionadas=(), especiales_sel=()):
     conn = get_conn()
     cuentas = conteos(conn)
@@ -328,6 +338,8 @@ def pagina_registro(datos=None, seleccionadas=(), especiales_sel=()):
         seleccionadas=set(seleccionadas),
         especiales_sel={str(x) for x in especiales_sel},
         requiere_clave=bool(clave_registro()),
+        ranking=ranking_actual(),
+        hoy_iso=hoy().isoformat(),
         titulo_pagina="Registro de servidores",
     )
 
@@ -512,7 +524,14 @@ def registros_filtrados(fecha):
     fechas = [r["fecha"] for r in conn.execute("SELECT DISTINCT fecha FROM registros ORDER BY fecha")]
     especiales = todos_especiales(conn)
     conn.close()
-    filas = [{**dict(r), "turno": etiqueta_turno(r["misa"], especiales)} for r in filas]
+    hoy_iso = hoy().isoformat()
+
+    def estado(r):
+        if r["asistio"] == 1:
+            return "Asistió"
+        return "No asistió" if r["fecha"] < hoy_iso else "Pendiente"
+
+    filas = [{**dict(r), "turno": etiqueta_turno(r["misa"], especiales), "estado": estado(r)} for r in filas]
     return filas, fechas, especiales
 
 
@@ -643,6 +662,17 @@ def admin_editar(id):
         d["id"] = id
         return formulario_registro(d, "Modificar servidor", editar=True)
     return formulario_registro(dict(fila), "Modificar servidor", editar=True)
+
+
+@app.route("/admin/asistencia/<int:id>", methods=["POST"])
+@requiere_admin
+def admin_asistencia(id):
+    valor = "1" if request.form.get("asistio") == "1" else "0"
+    conn = get_conn()
+    conn.execute("UPDATE registros SET asistio=? WHERE id=?", (int(valor), id))
+    conn.commit()
+    conn.close()
+    return redirect(url_for("admin", fecha=request.form.get("fecha", "")))
 
 
 @app.route("/admin/eliminar/<int:id>", methods=["POST"])
@@ -802,11 +832,11 @@ def admin_exportar():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Turnos de Parqueo"
-    ws.append(["Fecha", "Misa", "Nombre", "Apellido", "Celular"])
+    ws.append(["Fecha", "Misa", "Nombre", "Apellido", "Celular", "Asistencia"])
     for c in ws[1]:
         c.font = Font(bold=True)
     for r in filas:
-        ws.append([r["fecha"], r["turno"], r["nombre"], r["apellido"], r["celular"]])
+        ws.append([r["fecha"], r["turno"], r["nombre"], r["apellido"], r["celular"], r["estado"]])
     for col in ws.columns:
         ancho = max((len(str(c.value)) for c in col if c.value is not None), default=10)
         ws.column_dimensions[col[0].column_letter].width = ancho + 2

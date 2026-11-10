@@ -42,6 +42,7 @@ def _migrar_registros(conn):
             fecha TEXT NOT NULL,
             misa TEXT NOT NULL,
             creado TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            asistio INTEGER,
             UNIQUE(fecha, misa, celular)
         );
         INSERT INTO registros_nueva (id, nombre, apellido, celular, fecha, misa, creado)
@@ -51,6 +52,13 @@ def _migrar_registros(conn):
         COMMIT;
         """
     )
+
+
+def _asegurar_columna_asistio(conn):
+    """asistio: NULL = sin marcar, 1 = asistio, 0 = no asistio."""
+    columnas = [c["name"] for c in conn.execute("PRAGMA table_info(registros)")]
+    if "asistio" not in columnas:
+        conn.execute("ALTER TABLE registros ADD COLUMN asistio INTEGER")
 
 
 def init_db():
@@ -65,6 +73,7 @@ def init_db():
             fecha TEXT NOT NULL,
             misa TEXT NOT NULL,
             creado TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            asistio INTEGER,
             UNIQUE(fecha, misa, celular)
         );
         CREATE TABLE IF NOT EXISTS config (
@@ -81,6 +90,7 @@ def init_db():
         """
     )
     _migrar_registros(conn)
+    _asegurar_columna_asistio(conn)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_registros_turno ON registros(fecha, misa)")
     conn.commit()
     conn.close()
