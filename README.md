@@ -65,3 +65,69 @@ Igual que `rifa-app`: un servicio mas en `/root/docker-compose.yml`.
 Actualizaciones: `cd /var/www/parqueo-app && git pull && cd /root && docker compose up -d --build parqueo-app`.
 
 Respaldo de la base: `docker run --rm -v parqueo_data:/data -v $(pwd):/backup alpine tar czf /backup/parqueo_data_backup.tar.gz /data`.
+
+## Recordatorios por WhatsApp
+
+Cada servidor recibe un mensaje de WhatsApp el dia antes de su turno (domingos y misas especiales) usando la API oficial de WhatsApp Cloud de Meta con una plantilla pre-aprobada. Solo se envia a quienes dejaron marcada la casilla "Acepto recibir un recordatorio por WhatsApp" (las inscripciones anteriores a esta funcion quedan como aceptadas).
+
+### Configuracion en Meta
+
+1. Crear una cuenta de **Meta Business** (business.facebook.com).
+2. En developers.facebook.com crear una app de tipo Business y agregar el producto **WhatsApp**.
+3. Agregar el numero de telefono que enviara los mensajes. Notas:
+   - Un numero de **Google Voice** sirve si se registra en la Cloud API (no en la app de WhatsApp) y no esta ya registrado en WhatsApp.
+   - Si el codigo por SMS no llega, elegir la verificacion por **llamada de voz**.
+   - Google Voice puede reclamar numeros inactivos: hacer una llamada o enviar un texto desde el numero cada un par de meses.
+4. Crear un **usuario del sistema** (System User) en Business Settings, asignarle la app y generar un **token permanente** con el permiso `whatsapp_business_messaging`.
+5. Anotar el **Phone Number ID** (en WhatsApp > API Setup).
+6. Crear y enviar a aprobacion la plantilla (categoria **UTILITY**, idioma **Spanish**, nombre `recordatorio_parqueo`) con este cuerpo:
+
+   ```
+   Hola {{1}}, te recordamos tu turno de servicio de parqueo mañana {{2}} para la misa de {{3}}. Por favor llega a las {{4}}. ¡Gracias por servir! — Parqueo La Guadalupe
+   ```
+
+   Parametros: {{1}} nombre, {{2}} fecha (ej. "domingo 29 de noviembre"), {{3}} hora de la misa (ej. "10:00 AM"), {{4}} hora de llegada, 30 minutos antes (ej. "9:30 AM").
+
+### Variables de entorno
+
+Agregarlas al servicio `parqueo-app` en el compose (y los valores secretos a `/root/.env`):
+
+```yaml
+      environment:
+        - ADMIN_PASSWORD=${PARQUEO_ADMIN_PASSWORD}
+        - WHATSAPP_TOKEN=${PARQUEO_WHATSAPP_TOKEN}
+        - WHATSAPP_PHONE_NUMBER_ID=${PARQUEO_WHATSAPP_PHONE_NUMBER_ID}
+        - WHATSAPP_TEMPLATE=recordatorio_parqueo
+        - WHATSAPP_TEMPLATE_LANG=es
+```
+
+| Variable | Descripcion |
+|---|---|
+| `WHATSAPP_TOKEN` | Token permanente del usuario del sistema. |
+| `WHATSAPP_PHONE_NUMBER_ID` | ID del numero en la Cloud API. |
+| `WHATSAPP_TEMPLATE` | Nombre de la plantilla (por defecto `recordatorio_parqueo`). |
+| `WHATSAPP_TEMPLATE_LANG` | Codigo de idioma de la plantilla (por defecto `es`). |
+| `WHATSAPP_API_URL` | Opcional. Por defecto `https://graph.facebook.com/v21.0`. |
+
+Si falta el token o el Phone Number ID, el sistema trabaja en **modo simulado**: no llama a WhatsApp y solo registra el estado `simulado`.
+
+### Cron en el VPS
+
+Comando (envia a quienes sirven **manana**; es idempotente y no repite mensajes ya enviados):
+
+```bash
+docker compose exec -T parqueo-app flask --app app enviar-recordatorios
+```
+
+Linea de cron del host (`crontab -e`):
+
+```
+0 14,15 * * * cd <ruta-del-compose> && docker compose exec -T parqueo-app flask --app app enviar-recordatorios --solo-hora 10 >> /var/log/parqueo-recordatorios.log 2>&1
+```
+
+Corre todos los dias a las 14:00 y 15:00 UTC, pero `--solo-hora 10` hace que solo actue cuando en Miami (America/New_York) sean las 10:00 AM, sin importar el horario de verano. Asi el sabado a las 10:00 AM se avisa a los del domingo, y cualquier otro dia se avisa a quienes tengan una misa especial al dia siguiente. Si no hay inscritos manana, no envia nada. Opciones: `--fecha YYYY-MM-DD` (otra fecha), `--simulado` (sin llamar a WhatsApp). Los errores se reintentan en la siguiente ejecucion.
+
+### Como probar
+
+- `docker compose exec -T parqueo-app flask --app app enviar-recordatorios --simulado --fecha 2026-11-29` registra el estado `simulado` sin enviar nada.
+- En `/admin/recordatorios` (boton "Recordatorios" del panel) se ve el estado por servidor, se puede usar "Enviar recordatorios ahora" para la fecha elegida y "Enviar prueba" para mandar la plantilla con datos de ejemplo a un telefono (no se guarda en la base).

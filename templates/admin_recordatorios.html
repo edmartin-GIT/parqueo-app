@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Recordatorios - Turnos de Parqueo La Guadalupe{% endblock %}
+{% block content %}
+<div class="admin-barra">
+    <h2>Recordatorios de WhatsApp</h2>
+    <div class="admin-acciones">
+        <a class="nav-btn btn-gris" href="{{ url_for('admin') }}">Volver</a>
+    </div>
+</div>
+
+<p class="ayuda">
+    {% if configurado %}<strong>WhatsApp configurado.</strong> Los envíos son reales.
+    {% else %}<strong>Modo simulado:</strong> WhatsApp no está configurado en el servidor; no se enviará nada real.{% endif %}
+</p>
+
+<form method="get" class="filtro">
+    <label>Fecha
+        <input type="date" name="fecha" value="{{ fecha }}" onchange="this.form.submit()">
+    </label>
+    <noscript><button type="submit">Ver</button></noscript>
+</form>
+
+<form method="post" action="{{ url_for('admin_recordatorios_enviar') }}" onsubmit="return confirm('Enviar recordatorios para {{ fecha }}?');">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <input type="hidden" name="fecha" value="{{ fecha }}">
+    <button type="submit" class="btn-enviar">Enviar recordatorios ahora</button>
+</form>
+
+<form method="post" action="{{ url_for('admin_recordatorios_prueba') }}" class="filtro">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <input type="hidden" name="fecha" value="{{ fecha }}">
+    <label>Teléfono de prueba
+        <input type="tel" name="telefono" placeholder="(305) 555-0123" required>
+    </label>
+    <button type="submit" class="boton-secundario">Enviar prueba</button>
+</form>
+
+<div class="tabla-wrap">
+<table class="tabla-principal">
+    <thead>
+        <tr><th>Nombre</th><th>Misa</th><th>Teléfono</th><th>Acepta WhatsApp</th><th>Estado</th><th>Enviado en</th><th>Error</th></tr>
+    </thead>
+    <tbody>
+    {% for r in filas %}
+        <tr>
+            <td data-label="Nombre">{{ r.nombre }} {{ r.apellido }}</td>
+            <td data-label="Misa">{{ r.turno }}</td>
+            <td data-label="Teléfono">{{ r.celular }}</td>
+            <td data-label="Acepta WhatsApp">{{ 'Sí' if r.acepta_whatsapp else 'No' }}</td>
+            <td data-label="Estado">{{ r.rec_estado or ('pendiente' if r.acepta_whatsapp else '-') }}</td>
+            <td data-label="Enviado en">{{ r.rec_enviado_en or '' }}</td>
+            <td data-label="Error">{{ r.rec_error or '' }}</td>
+        </tr>
+    {% else %}
+        <tr><td colspan="7">No hay registros para {{ fecha|fecha_larga }}.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

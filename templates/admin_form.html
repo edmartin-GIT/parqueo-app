@@ -20,6 +20,10 @@
             {% endfor %}
         </select>
     </label>
+    <label class="check-wa">
+        <input type="checkbox" name="acepta_whatsapp" value="1" {% if datos.acepta_whatsapp %}checked{% endif %}>
+        <span>Acepta recordatorio por WhatsApp</span>
+    </label>
     <button type="submit" class="btn-enviar">Guardar</button>
     <a class="boton-secundario" href="{{ url_for('admin') }}">Cancelar</a>
 </form>

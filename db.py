@@ -78,9 +78,25 @@ def init_db():
             descripcion TEXT NOT NULL DEFAULT '',
             cupo INTEGER NOT NULL DEFAULT 12 CHECK(cupo BETWEEN 1 AND 50)
         );
+        CREATE TABLE IF NOT EXISTS recordatorios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            registro_id INTEGER NOT NULL,
+            tipo TEXT NOT NULL DEFAULT 'misa',
+            fecha TEXT,
+            misa TEXT,
+            telefono TEXT,
+            estado TEXT NOT NULL,
+            wa_message_id TEXT,
+            error TEXT,
+            enviado_en TEXT,
+            UNIQUE(registro_id, tipo)
+        );
         """
     )
     _migrar_registros(conn)
+    columnas = [c["name"] for c in conn.execute("PRAGMA table_info(registros)")]
+    if "acepta_whatsapp" not in columnas:
+        conn.execute("ALTER TABLE registros ADD COLUMN acepta_whatsapp INTEGER NOT NULL DEFAULT 1")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_registros_turno ON registros(fecha, misa)")
     conn.commit()
     conn.close()

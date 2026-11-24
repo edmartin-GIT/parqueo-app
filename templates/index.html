@@ -57,6 +57,10 @@ Cada misa tiene un mínimo de {{ CUPO }} servidores. Puedes inscribirte hasta co
         <p class="ayuda">Al elegir el horario se abrira el calendario para escoger los domingos.</p>
         <p id="resumen-fechas" class="ayuda" aria-live="polite"></p>
         <button type="button" class="enlace-btn" id="cambiar-domingos" hidden>Cambiar domingos</button>
+        <label class="check-wa">
+            <input type="checkbox" name="acepta_whatsapp" value="1" {% if datos.acepta_whatsapp %}checked{% endif %}>
+            <span>Acepto recibir un recordatorio por WhatsApp el día antes de mi turno.</span>
+        </label>
         <button type="submit" class="btn-enviar">Registrarme</button>
     </section>
 

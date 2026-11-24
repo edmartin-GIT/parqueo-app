@@ -218,3 +218,6 @@ dialog.dlg-cal::backdrop { background: rgba(15, 25, 40, .55); }
     .dlg-cal-cuerpo { padding: 14px 10px; }
     .dlg-cal-pie .btn-enviar { width: 100%; }
 }
+
+.check-wa { display: flex; align-items: flex-start; gap: .5rem; margin: .75rem 0; font-size: .95rem; }
+.check-wa input { width: auto; margin-top: .2rem; }

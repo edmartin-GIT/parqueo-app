@@ -11,6 +11,7 @@ from functools import wraps
 from io import BytesIO
 from zoneinfo import ZoneInfo
 
+import click
 import openpyxl
 from flask import (
     Flask, abort, flash, redirect, render_template, request, send_file,
@@ -19,7 +20,9 @@ from flask import (
 from openpyxl.styles import Font
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+import whatsapp
 from db import CUPO_MAXIMO, DB_PATH, MESES_ADELANTE, MISAS, get_conn, init_db
+from recordatorios import enviar_recordatorios, estado_recordatorios, parametros_plantilla
 
 ZONA = ZoneInfo("America/New_York")
 
@@ -143,7 +146,7 @@ def conteos(conn):
     return {(f["fecha"], f["misa"]): f["n"] for f in filas}
 
 
-def insertar_registro(conn, nombre, apellido, celular, fecha, misa, excluir_id=None):
+def insertar_registro(conn, nombre, apellido, celular, fecha, misa, excluir_id=None, acepta_whatsapp=1):
     """Devuelve 'ok', 'lleno', 'duplicado' o 'invalido'. Atomico: bloquea escritura mientras cuenta e inserta."""
     conn.execute("BEGIN IMMEDIATE")
     try:
@@ -159,8 +162,8 @@ def insertar_registro(conn, nombre, apellido, celular, fecha, misa, excluir_id=N
             conn.rollback()
             return "lleno"
         conn.execute(
-            "INSERT INTO registros (nombre, apellido, celular, fecha, misa) VALUES (?,?,?,?,?)",
-            (nombre, apellido, celular, fecha, misa),
+            "INSERT INTO registros (nombre, apellido, celular, fecha, misa, acepta_whatsapp) VALUES (?,?,?,?,?,?)",
+            (nombre, apellido, celular, fecha, misa, acepta_whatsapp),
         )
         conn.commit()
         return "ok"
@@ -324,7 +327,7 @@ def pagina_registro(datos=None, seleccionadas=(), especiales_sel=()):
         "index.html",
         meses=construir_meses(cuentas, domingos_disponibles(), {e["fecha"] for e in esp}),
         especiales=especiales,
-        datos=datos or {"misa": "1030"},
+        datos=datos or {"misa": "1030", "acepta_whatsapp": 1},
         seleccionadas=set(seleccionadas),
         especiales_sel={str(x) for x in especiales_sel},
         requiere_clave=bool(clave_registro()),
@@ -346,9 +349,11 @@ def registrar():
     fechas = sorted(set(request.form.getlist("fechas")))
     ids_especiales = sorted({x for x in request.form.getlist("especiales") if x.isdigit()}, key=int)
     validas = {d.isoformat() for d in domingos_disponibles()}
+    acepta = 1 if request.form.get("acepta_whatsapp") else 0
 
     datos = {"nombre": nombre, "apellido": apellido,
-             "celular": request.form.get("celular", ""), "misa": misa if misa in MISAS else "1030"}
+             "celular": request.form.get("celular", ""), "misa": misa if misa in MISAS else "1030",
+             "acepta_whatsapp": acepta}
     errores = []
     if not nombre:
         errores.append("Nombre es requerido.")
@@ -393,7 +398,7 @@ def registrar():
         if fecha is None:
             omitidos.append(texto)
             continue
-        resultado = insertar_registro(conn, nombre, apellido, celular, fecha, clave)
+        resultado = insertar_registro(conn, nombre, apellido, celular, fecha, clave, acepta_whatsapp=acepta)
         if resultado == "ok":
             ok.append(texto)
         elif resultado == "lleno":
@@ -567,6 +572,10 @@ def datos_formulario_admin():
     return errores, (nombre, apellido, celular, fecha, misa)
 
 
+def acepta_admin():
+    return 1 if request.form.get("acepta_whatsapp") else 0
+
+
 def formulario_registro(datos, titulo, **extra):
     incluir = (datos["fecha"], datos["misa"]) if datos.get("fecha") and datos.get("misa") else None
     return render_template("admin_form.html", datos=datos, opciones=opciones_turnos(incluir),
@@ -581,7 +590,7 @@ def admin_nuevo():
         errores, datos = datos_formulario_admin()
         if not errores:
             conn = get_conn()
-            res = insertar_registro(conn, *datos)
+            res = insertar_registro(conn, *datos, acepta_whatsapp=acepta_admin())
             conn.close()
             if res == "ok":
                 flash("Servidor añadido.", "success")
@@ -592,8 +601,9 @@ def admin_nuevo():
         for e in errores:
             flash(e, "error")
         d = dict(zip(("nombre", "apellido", "celular", "fecha", "misa"), datos))
+        d["acepta_whatsapp"] = acepta_admin()
         return formulario_registro(d, "Añadir servidor")
-    return formulario_registro({"misa": "1030"}, "Añadir servidor")
+    return formulario_registro({"misa": "1030", "acepta_whatsapp": 1}, "Añadir servidor")
 
 
 @app.route("/admin/editar/<int:id>", methods=["GET", "POST"])
@@ -626,8 +636,8 @@ def admin_editar(id):
                     errores.append("Ese turno ya esta lleno.")
                 else:
                     conn.execute(
-                        "UPDATE registros SET nombre=?, apellido=?, celular=?, fecha=?, misa=? WHERE id=?",
-                        (nombre, apellido, celular, fecha, misa, id),
+                        "UPDATE registros SET nombre=?, apellido=?, celular=?, fecha=?, misa=?, acepta_whatsapp=? WHERE id=?",
+                        (nombre, apellido, celular, fecha, misa, acepta_admin(), id),
                     )
                     conn.commit()
                     flash("Registro actualizado.", "success")
@@ -641,6 +651,7 @@ def admin_editar(id):
             flash(e, "error")
         d = dict(zip(("nombre", "apellido", "celular", "fecha", "misa"), datos))
         d["id"] = id
+        d["acepta_whatsapp"] = acepta_admin()
         return formulario_registro(d, "Modificar servidor", editar=True)
     return formulario_registro(dict(fila), "Modificar servidor", editar=True)
 
@@ -795,6 +806,60 @@ def admin_especial_eliminar(id):
     return redirect(url_for("admin_especiales"))
 
 
+# ---------- Administrador: recordatorios de WhatsApp ----------
+
+def fecha_objetivo_valida(valor):
+    try:
+        return date.fromisoformat(valor).isoformat()
+    except (ValueError, TypeError):
+        return (hoy() + timedelta(days=1)).isoformat()
+
+
+@app.route("/admin/recordatorios")
+@requiere_admin
+def admin_recordatorios():
+    fecha = fecha_objetivo_valida(request.args.get("fecha", ""))
+    conn = get_conn()
+    filas = estado_recordatorios(conn, fecha)
+    especiales = todos_especiales(conn)
+    conn.close()
+    filas = [{**dict(r), "turno": etiqueta_turno(r["misa"], especiales)} for r in filas]
+    return render_template("admin_recordatorios.html", filas=filas, fecha=fecha,
+                           configurado=whatsapp.configurado(),
+                           titulo_pagina="Recordatorios de WhatsApp")
+
+
+@app.route("/admin/recordatorios/enviar", methods=["POST"])
+@requiere_admin
+def admin_recordatorios_enviar():
+    fecha = fecha_objetivo_valida(request.form.get("fecha", ""))
+    r = enviar_recordatorios(fecha)
+    modo = "SIMULADO (WhatsApp no configurado) · " if r["simulado"] else ""
+    flash(f"{modo}Recordatorios para {fecha_larga(fecha)}: {r['enviados']} enviados, "
+          f"{r['simulados']} simulados, {r['errores']} con error, {r['sin_telefono']} sin teléfono válido, "
+          f"{r['ya_enviados']} ya enviados antes.", "error" if r["errores"] else "success")
+    return redirect(url_for("admin_recordatorios", fecha=fecha))
+
+
+@app.route("/admin/recordatorios/prueba", methods=["POST"])
+@requiere_admin
+def admin_recordatorios_prueba():
+    fecha = fecha_objetivo_valida(request.form.get("fecha", ""))
+    tel = whatsapp.normalizar_telefono(request.form.get("telefono"))
+    if not tel:
+        flash("El teléfono de prueba debe tener 10 dígitos.", "error")
+    elif not whatsapp.configurado():
+        flash("WhatsApp no está configurado en el servidor (modo simulado): no se envió la prueba.", "error")
+    else:
+        ok, mid, error = whatsapp.enviar_plantilla(
+            tel, parametros_plantilla("Nombre de prueba", fecha, "10:00 AM", "9:30 AM"))
+        if ok:
+            flash(f"Prueba enviada a +{tel} (id {mid}).", "success")
+        else:
+            flash(f"Error al enviar la prueba: {error}", "error")
+    return redirect(url_for("admin_recordatorios", fecha=fecha))
+
+
 @app.route("/admin/exportar")
 @requiere_admin
 def admin_exportar():
@@ -802,11 +867,12 @@ def admin_exportar():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Turnos de Parqueo"
-    ws.append(["Fecha", "Misa", "Nombre", "Apellido", "Celular"])
+    ws.append(["Fecha", "Misa", "Nombre", "Apellido", "Celular", "Acepta WhatsApp"])
     for c in ws[1]:
         c.font = Font(bold=True)
     for r in filas:
-        ws.append([r["fecha"], r["turno"], r["nombre"], r["apellido"], r["celular"]])
+        ws.append([r["fecha"], r["turno"], r["nombre"], r["apellido"], r["celular"],
+                   "Sí" if r["acepta_whatsapp"] else "No"])
     for col in ws.columns:
         ancho = max((len(str(c.value)) for c in col if c.value is not None), default=10)
         ws.column_dimensions[col[0].column_letter].width = ancho + 2
@@ -831,6 +897,32 @@ def cabeceras(resp):
 
 
 init_db()
+
+
+@app.cli.command("enviar-recordatorios")
+@click.option("--fecha", default=None, help="Fecha YYYY-MM-DD (por defecto: manana, hora de Miami).")
+@click.option("--simulado", is_flag=True, help="No llama a WhatsApp; solo registra estado 'simulado'.")
+@click.option("--solo-hora", type=int, default=None,
+              help="Salir sin hacer nada si la hora actual de Miami no es esta (0-23).")
+def cmd_enviar_recordatorios(fecha, simulado, solo_hora):
+    """Envia el recordatorio de WhatsApp a quienes sirven la fecha indicada."""
+    if solo_hora is not None and datetime.now(ZONA).hour != solo_hora:
+        click.echo(f"Hora actual en Miami distinta de {solo_hora}: nada que hacer.")
+        return
+    if fecha:
+        try:
+            fecha = date.fromisoformat(fecha).isoformat()
+        except ValueError:
+            raise click.BadParameter("Use el formato YYYY-MM-DD.", param_hint="--fecha")
+    else:
+        fecha = (hoy() + timedelta(days=1)).isoformat()
+    init_db()
+    r = enviar_recordatorios(fecha, forzar_simulado=simulado)
+    click.echo(
+        f"Recordatorios {r['fecha']}{' (SIMULADO)' if r['simulado'] else ''}: total={r['total']} "
+        f"enviados={r['enviados']} simulados={r['simulados']} errores={r['errores']} "
+        f"sin_telefono={r['sin_telefono']} ya_enviados={r['ya_enviados']} omitidos={r['omitidos']}")
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5002)
