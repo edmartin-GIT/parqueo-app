@@ -54,13 +54,19 @@ Cada misa tiene un mínimo de {{ CUPO }} servidores. Puedes inscribirte hasta co
         </fieldset>
         {% endif %}
 
-        <p class="ayuda">Despues elige los domingos en el calendario.</p>
+        <p class="ayuda">Al elegir el horario se abrira el calendario para escoger los domingos.</p>
         <p id="resumen-fechas" class="ayuda" aria-live="polite"></p>
+        <button type="button" class="enlace-btn" id="cambiar-domingos" hidden>Cambiar domingos</button>
         <button type="submit" class="btn-enviar">Registrarme</button>
     </section>
 
-    <section class="calendario">
-        <h2>Domingos disponibles</h2>
+    <dialog id="dlg-cal" class="dlg-cal" role="dialog" aria-modal="true" aria-labelledby="dlg-cal-titulo">
+        <div class="dlg-cal-cab">
+            <h3 id="dlg-cal-titulo">Elige tus domingos</h3>
+            <button type="button" class="dlg-cal-x" id="cal-x" aria-label="Cerrar calendario">&times;</button>
+        </div>
+        <div class="dlg-cal-cuerpo">
+    
         <div class="meses-tabs">
             {% for m in meses %}
             <button type="button" class="mes-tab" data-mes="{{ loop.index0 }}">{{ m.etiqueta }}</button>
@@ -96,7 +102,11 @@ Cada misa tiene un mínimo de {{ CUPO }} servidores. Puedes inscribirte hasta co
             <span><i class="lg-lleno"></i>Lleno</span>
         </div>
         <p class="ayuda" id="calendario-nota"></p>
-    </section>
+        </div>
+        <div class="dlg-cal-pie">
+            <button type="button" class="btn-enviar" id="cal-ok">Confirmar domingos</button>
+        </div>
+    </dialog>
 </form>
 
 <dialog id="dlg-clave" aria-labelledby="dlg-titulo">
@@ -149,10 +159,41 @@ Cada misa tiene un mínimo de {{ CUPO }} servidores. Puedes inscribirte hasta co
         document.getElementById('calendario-nota').textContent = misa
             ? 'Cupos mostrados para la misa de ' + etiquetas[misa] + '.'
             : 'Elige un horario de misa para ver los cupos.';
-        var sel = form.querySelectorAll('input[name="fechas"]:checked, input[name="especiales"]:checked').length;
-        document.getElementById('resumen-fechas').textContent = sel
-            ? 'Turnos elegidos: ' + sel : 'Aun no has elegido turnos.';
+        var fechas = Array.prototype.map.call(form.querySelectorAll('input[name="fechas"]:checked'), function (cb) {
+            var p = cb.value.split('-');
+            return new Date(+p[0], +p[1] - 1, +p[2]).toLocaleDateString('es', { day: 'numeric', month: 'short' });
+        });
+        var esp = form.querySelectorAll('input[name="especiales"]:checked').length;
+        var txt = '';
+        if (fechas.length) txt = 'Domingos elegidos (' + fechas.length + '): ' + fechas.join(', ') + '.';
+        if (esp) txt += (txt ? ' ' : '') + 'Misas especiales: ' + esp + '.';
+        document.getElementById('resumen-fechas').textContent = txt || 'Aun no has elegido turnos.';
+        document.getElementById('cambiar-domingos').hidden = !misa;
+        document.getElementById('dlg-cal-titulo').textContent = misa
+            ? 'Elige tus domingos — misa de ' + etiquetas[misa] : 'Elige tus domingos';
     }
+
+    var dlgCal = document.getElementById('dlg-cal');
+    var calOrigen = null;
+    function abrirCal(origen) {
+        calOrigen = origen || null;
+        refrescar();
+        if (dlgCal.showModal) { if (!dlgCal.open) dlgCal.showModal(); } else { dlgCal.setAttribute('open', ''); }
+        document.body.classList.add('modal-abierto');
+        dlgCal.querySelector('.mes-tab.activo, .mes-tab').focus();
+    }
+    dlgCal.addEventListener('close', function () {
+        document.body.classList.remove('modal-abierto');
+        if (calOrigen && calOrigen.focus) calOrigen.focus();
+    });
+    function cerrarCal() { if (dlgCal.close) dlgCal.close(); else dlgCal.removeAttribute('open'); }
+    document.getElementById('cal-ok').addEventListener('click', cerrarCal);
+    document.getElementById('cal-x').addEventListener('click', cerrarCal);
+    dlgCal.addEventListener('click', function (e) { if (e.target === dlgCal) cerrarCal(); });
+    form.querySelectorAll('input[name="misa"]').forEach(function (r) {
+        r.addEventListener('click', function () { abrirCal(r); });
+    });
+    document.getElementById('cambiar-domingos').addEventListener('click', function (e) { abrirCal(e.currentTarget); });
 
     var REQUIERE_CLAVE = {{ 'true' if requiere_clave else 'false' }};
     var dlg = document.getElementById('dlg-clave');
