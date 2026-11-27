@@ -14,8 +14,8 @@ from zoneinfo import ZoneInfo
 import click
 import openpyxl
 from flask import (
-    Flask, abort, flash, redirect, render_template, request, send_file,
-    session, url_for,
+    Flask, Response, abort, flash, redirect, render_template, request,
+    send_file, session, url_for,
 )
 from openpyxl.styles import Font
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -23,6 +23,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import whatsapp
 from db import CUPO_MAXIMO, DB_PATH, MESES_ADELANTE, MISAS, get_conn, init_db
 from recordatorios import enviar_recordatorios, estado_recordatorios, parametros_plantilla
+from webhook_whatsapp import firma_valida, procesar_en_segundo_plano
 
 ZONA = ZoneInfo("America/New_York")
 
@@ -884,6 +885,33 @@ def admin_exportar():
         download_name=f"turnos_parqueo_{hoy().isoformat()}.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+
+# ---------- Webhook de WhatsApp (sin sesion ni CSRF: se autentica por firma HMAC) ----------
+
+WEBHOOK_MAX_BYTES = 1024 * 1024
+
+
+@app.route("/webhooks/whatsapp", methods=["GET", "POST"])
+def webhook_whatsapp():
+    if request.method == "GET":
+        esperado = os.environ.get("WHATSAPP_VERIFY_TOKEN", "")
+        token = request.args.get("hub.verify_token", "")
+        if (esperado and request.args.get("hub.mode") == "subscribe"
+                and hmac.compare_digest(token.encode("utf-8"), esperado.encode("utf-8"))):
+            return Response(request.args.get("hub.challenge", ""), mimetype="text/plain")
+        return Response("Forbidden", status=403, mimetype="text/plain")
+
+    if request.content_length is not None and request.content_length > WEBHOOK_MAX_BYTES:
+        return Response("Payload too large", status=413, mimetype="text/plain")
+    body = request.get_data(cache=False)
+    if len(body) > WEBHOOK_MAX_BYTES:
+        return Response("Payload too large", status=413, mimetype="text/plain")
+    if not firma_valida(body, request.headers.get("X-Hub-Signature-256", ""),
+                        os.environ.get("WHATSAPP_APP_SECRET", "")):
+        return Response("Unauthorized", status=401, mimetype="text/plain")
+    procesar_en_segundo_plano(body)
+    return Response("OK", status=200, mimetype="text/plain")
 
 
 @app.after_request

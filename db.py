@@ -91,6 +91,22 @@ def init_db():
             enviado_en TEXT,
             UNIQUE(registro_id, tipo)
         );
+        CREATE TABLE IF NOT EXISTS whatsapp_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            recibido TEXT NOT NULL DEFAULT (datetime('now')),
+            tipo TEXT NOT NULL,
+            wamid TEXT,
+            status TEXT,
+            timestamp TEXT,
+            recipient_id TEXT,
+            error_code INTEGER,
+            error_title TEXT,
+            error_details TEXT,
+            from_number TEXT,
+            msg_type TEXT,
+            text_body TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_whatsapp_events_wamid ON whatsapp_events(wamid);
         """
     )
     _migrar_registros(conn)

@@ -131,3 +131,20 @@ Corre todos los dias a las 14:00 y 15:00 UTC, pero `--solo-hora 10` hace que sol
 
 - `docker compose exec -T parqueo-app flask --app app enviar-recordatorios --simulado --fecha 2026-11-29` registra el estado `simulado` sin enviar nada.
 - En `/admin/recordatorios` (boton "Recordatorios" del panel) se ve el estado por servidor, se puede usar "Enviar recordatorios ahora" para la fecha elegida y "Enviar prueba" para mandar la plantilla con datos de ejemplo a un telefono (no se guarda en la base).
+
+## Webhook de WhatsApp (estados de entrega)
+
+Recibe de Meta los estados de cada mensaje (`sent`, `delivered`, `read`, `failed`) y los mensajes entrantes, y los guarda en la tabla `whatsapp_events`. Los `failed` quedan ademas en el log como `WARNING` con el codigo y titulo del error.
+
+- URL de callback: `https://parqueo.guadalupedoral.app/webhooks/whatsapp`
+- `WHATSAPP_VERIFY_TOKEN`: texto inventado por el administrador; se escribe igual en Meta al configurar el webhook.
+- `WHATSAPP_APP_SECRET`: App secret en Meta (App settings > Basic > App secret); se usa para validar la firma `X-Hub-Signature-256`.
+
+Lineas del compose (seccion `environment` de `parqueo-app`):
+
+```yaml
+- WHATSAPP_VERIFY_TOKEN=${PARQUEO_WHATSAPP_VERIFY_TOKEN}
+- WHATSAPP_APP_SECRET=${PARQUEO_WHATSAPP_APP_SECRET}
+```
+
+En Meta, ir a WhatsApp > Configuration > Webhook, pegar la URL y el verify token, y suscribirse al campo `messages`.
