@@ -4,6 +4,10 @@
 <h2>{{ titulo }}</h2>
 <form method="post" class="formulario angosto">
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    {% if volver %}
+    <input type="hidden" name="volver_fecha" value="{{ volver.fecha }}">
+    <input type="hidden" name="q" value="{{ volver.q }}">
+    {% endif %}
     <label>Nombre
         <input type="text" name="nombre" value="{{ datos.nombre or '' }}" maxlength="60" required>
     </label>
@@ -25,6 +29,6 @@
         <span>Acepta recordatorio por WhatsApp</span>
     </label>
     <button type="submit" class="btn-enviar">Guardar</button>
-    <a class="boton-secundario" href="{{ url_for('admin') }}">Cancelar</a>
+    <a class="boton-secundario" href="{% if volver %}{{ url_for('admin', fecha=volver.fecha, q=volver.q or None) }}{% else %}{{ url_for('admin') }}{% endif %}">Cancelar</a>
 </form>
 {% endblock %}

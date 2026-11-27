@@ -6,6 +6,7 @@ import re
 import secrets
 import sqlite3
 import time
+import unicodedata
 from datetime import date, datetime, timedelta
 from functools import wraps
 from io import BytesIO
@@ -522,7 +523,24 @@ def admin_salir():
     return redirect(url_for("index"))
 
 
-def registros_filtrados(fecha):
+def normalizar_busqueda(texto):
+    """Minusculas, sin acentos y con espacios colapsados, para buscar sin distinguir tildes."""
+    d = unicodedata.normalize("NFKD", texto or "")
+    d = "".join(c for c in d if not unicodedata.combining(c))
+    return " ".join(d.casefold().split())
+
+
+def coincide_busqueda(r, q_norm, q_digitos):
+    nombre = normalizar_busqueda(r["nombre"])
+    apellido = normalizar_busqueda(r["apellido"])
+    if q_norm in f"{nombre} {apellido}" or q_norm in f"{apellido} {nombre}":
+        return True
+    if len(q_digitos) >= 3:
+        return q_digitos in "".join(c for c in (r["celular"] or "") if c.isdigit())
+    return False
+
+
+def registros_filtrados(fecha, q=""):
     conn = get_conn()
     if fecha:
         filas = conn.execute(
@@ -540,6 +558,10 @@ def registros_filtrados(fecha):
             return "Asistió"
         return "No asistió" if r["fecha"] < hoy_iso else "Pendiente"
 
+    q_norm = normalizar_busqueda(q)
+    if q_norm:
+        q_digitos = "".join(c for c in q if c.isdigit())
+        filas = [r for r in filas if coincide_busqueda(r, q_norm, q_digitos)]
     filas = [{**dict(r), "turno": etiqueta_turno(r["misa"], especiales), "estado": estado(r)} for r in filas]
     return filas, fechas, especiales
 
@@ -564,17 +586,26 @@ def opciones_turnos(incluir=None):
     return [(f"{f}|{k}", t) for (f, k), t in sorted(opciones.items())]
 
 
+def volver_admin(fecha, q):
+    """Redirige al panel conservando fecha y busqueda (omite q si esta vacia)."""
+    q = (q or "").strip()[:60]
+    if q:
+        return redirect(url_for("admin", fecha=fecha, q=q))
+    return redirect(url_for("admin", fecha=fecha))
+
+
 @app.route("/admin")
 @requiere_admin
 def admin():
     fecha = request.args.get("fecha", "")
-    filas, fechas_con_datos, _ = registros_filtrados(fecha)
+    q = request.args.get("q", "").strip()[:60]
+    filas, fechas_con_datos, _ = registros_filtrados(fecha, q)
     conn = get_conn()
     fechas_esp = {e["fecha"] for e in especiales_en_ventana(conn)}
     conn.close()
     todas = sorted({d.isoformat() for d in domingos_disponibles()} | set(fechas_con_datos) | fechas_esp)
     return render_template("admin.html", filas=filas, fechas=todas, filtro=fecha,
-                           titulo_pagina="Administrar registros")
+                           q=q, total=len(filas), titulo_pagina="Administrar registros")
 
 
 def datos_formulario_admin():
@@ -639,6 +670,11 @@ def admin_editar(id):
         flash("Registro no encontrado.", "error")
         return redirect(url_for("admin"))
 
+    origen = request.form if request.method == "POST" else request.args
+    volver = None
+    if "volver_fecha" in origen:
+        volver = {"fecha": origen.get("volver_fecha", ""), "q": origen.get("q", "").strip()[:60]}
+
     if request.method == "POST":
         errores, datos = datos_formulario_admin()
         if not errores:
@@ -665,6 +701,8 @@ def admin_editar(id):
                     conn.commit()
                     flash("Registro actualizado.", "success")
                     conn.close()
+                    if volver is not None:
+                        return volver_admin(volver["fecha"], volver["q"])
                     return redirect(url_for("admin", fecha=fecha))
             except sqlite3.IntegrityError:
                 conn.rollback()
@@ -675,8 +713,8 @@ def admin_editar(id):
         d = dict(zip(("nombre", "apellido", "celular", "fecha", "misa"), datos))
         d["id"] = id
         d["acepta_whatsapp"] = acepta_admin()
-        return formulario_registro(d, "Modificar servidor", editar=True)
-    return formulario_registro(dict(fila), "Modificar servidor", editar=True)
+        return formulario_registro(d, "Modificar servidor", editar=True, volver=volver)
+    return formulario_registro(dict(fila), "Modificar servidor", editar=True, volver=volver)
 
 
 @app.route("/admin/asistencia/<int:id>", methods=["POST"])
@@ -687,7 +725,7 @@ def admin_asistencia(id):
     conn.execute("UPDATE registros SET asistio=? WHERE id=?", (int(valor), id))
     conn.commit()
     conn.close()
-    return redirect(url_for("admin", fecha=request.form.get("fecha", "")))
+    return volver_admin(request.form.get("fecha", ""), request.form.get("q", ""))
 
 
 @app.route("/admin/eliminar/<int:id>", methods=["POST"])
@@ -698,7 +736,7 @@ def admin_eliminar(id):
     conn.commit()
     conn.close()
     flash("Registro eliminado.", "success")
-    return redirect(url_for("admin", fecha=request.form.get("fecha", "")))
+    return volver_admin(request.form.get("fecha", ""), request.form.get("q", ""))
 
 
 # ---------- Administrador: clave de registro ----------

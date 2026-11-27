@@ -256,3 +256,10 @@ dialog.dlg-cal::backdrop { background: rgba(15, 25, 40, .55); }
 .chk-asist input { width: 20px; height: 20px; }
 
 .aviso-reto { margin: 10px 0; padding: 12px 14px; border: 1px solid #1f3a5f; border-left: 5px solid #1f3a5f; border-radius: 6px; background: #eef3fa; color: #1f3a5f; font-weight: 600; }
+
+.filtro { max-width: 520px; display: grid; gap: 12px; }
+.filtro-buscar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.filtro-buscar input[type="search"] { flex: 1 1 200px; min-width: 0; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; font-family: inherit; }
+.filtro-buscar button { padding: 10px 16px; border: none; border-radius: 4px; background: #2980b9; color: white; font: inherit; cursor: pointer; }
+.filtro-buscar a { font-size: 14px; }
+.filtro-resultado { margin: 0 0 12px; font-size: 14px; color: #444; }
