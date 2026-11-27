@@ -31,8 +31,12 @@ def _migrar_registros(conn):
     ).fetchone()
     if fila is None or "CHECK" not in (fila["sql"] or "").upper():
         return
+    viejas = {c["name"] for c in conn.execute("PRAGMA table_info(registros)")}
+    copiar = ["id", "nombre", "apellido", "celular", "fecha", "misa", "creado"]
+    copiar += [c for c in ("asistio", "acepta_whatsapp") if c in viejas]
+    lista = ", ".join(copiar)
     conn.executescript(
-        """
+        f"""
         BEGIN;
         CREATE TABLE registros_nueva (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,15 +46,24 @@ def _migrar_registros(conn):
             fecha TEXT NOT NULL,
             misa TEXT NOT NULL,
             creado TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            asistio INTEGER,
+            acepta_whatsapp INTEGER NOT NULL DEFAULT 1,
             UNIQUE(fecha, misa, celular)
         );
-        INSERT INTO registros_nueva (id, nombre, apellido, celular, fecha, misa, creado)
-            SELECT id, nombre, apellido, celular, fecha, misa, creado FROM registros;
+        INSERT INTO registros_nueva ({lista})
+            SELECT {lista} FROM registros;
         DROP TABLE registros;
         ALTER TABLE registros_nueva RENAME TO registros;
         COMMIT;
         """
     )
+
+
+def _asegurar_columna_asistio(conn):
+    """asistio: NULL = sin marcar, 1 = asistio, 0 = no asistio."""
+    columnas = [c["name"] for c in conn.execute("PRAGMA table_info(registros)")]
+    if "asistio" not in columnas:
+        conn.execute("ALTER TABLE registros ADD COLUMN asistio INTEGER")
 
 
 def init_db():
@@ -65,6 +78,7 @@ def init_db():
             fecha TEXT NOT NULL,
             misa TEXT NOT NULL,
             creado TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            asistio INTEGER,
             UNIQUE(fecha, misa, celular)
         );
         CREATE TABLE IF NOT EXISTS config (
@@ -113,6 +127,7 @@ def init_db():
     columnas = [c["name"] for c in conn.execute("PRAGMA table_info(registros)")]
     if "acepta_whatsapp" not in columnas:
         conn.execute("ALTER TABLE registros ADD COLUMN acepta_whatsapp INTEGER NOT NULL DEFAULT 1")
+    _asegurar_columna_asistio(conn)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_registros_turno ON registros(fecha, misa)")
     conn.commit()
     conn.close()
