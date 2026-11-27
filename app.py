@@ -24,7 +24,7 @@ import whatsapp
 from db import CUPO_MAXIMO, DB_PATH, MESES_ADELANTE, MISAS, get_conn, init_db
 from recordatorios import enviar_recordatorios, estado_recordatorios, parametros_plantilla
 from webhook_whatsapp import firma_valida, procesar_en_segundo_plano
-from ranking import calcular_ranking
+from ranking import calcular_ranking, inicio_reto
 
 ZONA = ZoneInfo("America/New_York")
 
@@ -316,10 +316,10 @@ def construir_meses(cuentas, domingos, fechas_especiales):
 def ranking_actual():
     conn = get_conn()
     filas = [dict(r) for r in conn.execute(
-        "SELECT fecha, misa, nombre, apellido, celular, asistio FROM registros WHERE fecha <= ?",
-        (hoy().isoformat(),))]
+        "SELECT fecha, misa, nombre, apellido, celular, asistio FROM registros")]
     conn.close()
-    return calcular_ranking(filas, hoy())
+    inicio = inicio_reto()
+    return calcular_ranking(filas, hoy(), inicio=inicio), inicio, hoy() >= inicio
 
 
 def pagina_registro(datos=None, seleccionadas=(), especiales_sel=()):
@@ -334,6 +334,7 @@ def pagina_registro(datos=None, seleccionadas=(), especiales_sel=()):
             "id": e["id"], "fecha": e["fecha"], "etiqueta": etiqueta_especial(e),
             "n": n, "cupo": e["cupo"], "lleno": n >= e["cupo"],
         })
+    ranking, inicio, reto_iniciado = ranking_actual()
     return render_template(
         "index.html",
         meses=construir_meses(cuentas, domingos_disponibles(), {e["fecha"] for e in esp}),
@@ -342,8 +343,10 @@ def pagina_registro(datos=None, seleccionadas=(), especiales_sel=()):
         seleccionadas=set(seleccionadas),
         especiales_sel={str(x) for x in especiales_sel},
         requiere_clave=bool(clave_registro()),
-        ranking=ranking_actual(),
+        ranking=ranking,
         hoy_iso=hoy().isoformat(),
+        inicio_reto=inicio.isoformat(),
+        reto_iniciado=reto_iniciado,
         titulo_pagina="Registro de servidores",
     )
 

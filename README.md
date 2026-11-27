@@ -28,7 +28,12 @@ Queda en `http://localhost:5002`. La base SQLite (`parqueo.db`) se crea sola en 
 | `ADMIN_PASSWORD` | Contraseña del panel `/admin`. Sin ella el acceso de administrador queda deshabilitado. |
 | `PARQUEO_DB_PATH` | Ruta de la base SQLite (en Docker: `/app/data/parqueo.db`). |
 | `SECRET_KEY` | Opcional. Si falta, se genera una y se guarda junto a la base de datos. |
+| `RANKING_INICIO` | Opcional. Fecha ISO (`AAAA-MM-DD`) de inicio del reto de estrellas. Por defecto `2026-12-01`. |
 | `COOKIE_SECURE` | `1` en produccion con HTTPS (el Dockerfile ya lo activa). |
+
+## Reto de estrellas (ranking)
+
+El reto comienza el 1 de diciembre de 2026: antes de esa fecha todos los servidores aparecen con 0 estrellas, y desde entonces solo cuentan los servicios con fecha igual o posterior al inicio (el primer servicio asistido dentro del reto vale 3 estrellas). Se puede cambiar con la variable opcional `RANKING_INICIO`.
 
 ## Despliegue en el VPS de curiositylogic.cloud (Docker + Traefik)
 

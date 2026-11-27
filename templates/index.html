@@ -116,8 +116,9 @@ Cada misa tiene un mínimo de {{ CUPO }} servidores. Puedes inscribirte hasta co
 <section class="ranking" id="ranking">
     <div class="ranking-cab">
         <h2>Reto del parqueo: ranking de servidores</h2>
-        <p class="ayuda">Estrellas acumuladas hasta el {{ hoy_iso|fecha_larga }}. Se actualiza solo.</p>
+        {% if reto_iniciado %}<p class="ayuda">Estrellas acumuladas desde el {{ inicio_reto|fecha_larga }} hasta el {{ hoy_iso|fecha_larga }}. Se actualiza solo.</p>{% endif %}
     </div>
+    {% if not reto_iniciado %}<p class="aviso-reto">El reto comienza el {{ inicio_reto|fecha_larga }}. Todos empiezan con 0 estrellas.</p>{% endif %}
     {% if ranking %}
     <div class="tabla-wrap">
     <table class="tabla-ranking">
@@ -126,27 +127,29 @@ Cada misa tiene un mínimo de {{ CUPO }} servidores. Puedes inscribirte hasta co
         </thead>
         <tbody>
         {% for x in ranking[:15] %}
-            <tr class="{% if x.posicion <= 3 %}podio podio-{{ x.posicion }}{% endif %}">
-                <td class="pos"><span>{{ x.posicion }}</span></td>
+            <tr class="{% if reto_iniciado and x.posicion <= 3 %}podio podio-{{ x.posicion }}{% endif %}">
+                <td class="pos"><span>{% if reto_iniciado %}{{ x.posicion }}{% else %}–{% endif %}</span></td>
                 <td class="quien">{{ x.publico }}</td>
-                <td class="num est">{{ x.estrellas }} <span class="estrella-g">★</span></td>
-                <td class="num">{{ x.servicios }}</td>
-                <td class="num">{{ x.ausencias }}</td>
-                <td class="num">{% if x.meses_perfectos %}{{ x.meses_perfectos|length }} ×5 ★{% else %}-{% endif %}</td>
+                <td class="num est">{{ x.estrellas if reto_iniciado else 0 }} <span class="estrella-g">★</span></td>
+                <td class="num">{{ x.servicios if reto_iniciado else 0 }}</td>
+                <td class="num">{{ x.ausencias if reto_iniciado else 0 }}</td>
+                <td class="num">{% if reto_iniciado and x.meses_perfectos %}{{ x.meses_perfectos|length }} ×5 ★{% else %}-{% endif %}</td>
             </tr>
         {% endfor %}
         </tbody>
     </table>
     </div>
-    {% if ranking|length > 15 %}<p class="ayuda">Y {{ ranking|length - 15 }} servidores más participando.</p>{% endif %}
+    {% if ranking|length > 15 %}<p class="ayuda">Y {{ ranking|length - 15 }} servidores más {% if reto_iniciado %}participando{% else %}inscritos{% endif %}.</p>{% endif %}
     {% else %}
-    <p class="ayuda">El ranking aparecerá cuando se complete el primer servicio.</p>
+    <p class="ayuda">Aún no hay servidores inscritos.</p>
     {% endif %}
     <details class="reglas">
         <summary>¿Cómo se ganan las estrellas?</summary>
         <ul>
-            <li>Tu primer servicio en el parqueo vale <strong>3 estrellas</strong>.</li>
+            <li>El reto cuenta los servicios desde el {{ inicio_reto|fecha_larga }}.</li>
+            <li>Tu primer servicio en el parqueo vale <strong>+3 estrellas</strong>.</li>
             <li>Cada servicio al que asistes: <strong>+1 estrella</strong>.</li>
+            <li><strong>Misas Especiales</strong>: si asistes, ganas <strong>+2 estrellas</strong>.</li>
             <li>Cada servicio en el que te registras y no asistes: <strong>−1 estrella</strong>.</li>
             <li>Si asistes a <strong>todos los domingos de un mes</strong>, ganas <strong>+5 estrellas</strong>. Se suman al comenzar el mes siguiente.</li>
         </ul>

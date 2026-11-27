@@ -7,11 +7,13 @@ Reglas:
 4. Por cada mes en que asiste a todos los domingos del mes: +5 estrellas,
    acreditadas el primer dia del mes siguiente.
 
-Solo cuentan los servicios hasta hoy. Un servicio de hoy cuenta cuando ya esta marcado
+Solo cuentan los servicios desde el inicio del reto (INICIO_RETO) hasta hoy; antes todos tienen 0.
+ Un servicio de hoy cuenta cuando ya esta marcado
 (asistio / no asistio); los de dias anteriores sin marcar cuentan como no asistidos
 (ASUMIR_ASISTENCIA=False).
 """
 import calendar
+import os
 import re
 from datetime import date
 
@@ -21,6 +23,15 @@ PENALIZACION_AUSENCIA = 1
 BONO_MES_COMPLETO = 5
 ASUMIR_ASISTENCIA = False
 ESTRELLAS_MISA_ESPECIAL = 2
+INICIO_RETO = date(2026, 12, 1)
+
+
+def inicio_reto():
+    """Fecha de inicio del reto: env RANKING_INICIO (ISO) si es valida, si no INICIO_RETO."""
+    try:
+        return date.fromisoformat(os.environ["RANKING_INICIO"].strip())
+    except (KeyError, ValueError):
+        return INICIO_RETO
 
 
 def domingos_del_mes(anio, mes):
@@ -38,23 +49,28 @@ def nombre_publico(nombre, apellido):
     return f"{(nombre or '').strip()} {inicial}.".strip() if inicial else (nombre or "").strip()
 
 
-def calcular_ranking(filas, hoy, asumir_asistencia=ASUMIR_ASISTENCIA):
-    """filas: iterable de dicts con fecha (ISO), nombre, apellido, celular, asistio (None/0/1)."""
+def calcular_ranking(filas, hoy, asumir_asistencia=ASUMIR_ASISTENCIA, inicio=None):
+    """filas: iterable de dicts con fecha (ISO), nombre, apellido, celular, asistio (None/0/1).
+
+    Todas las personas aparecen; solo puntuan los servicios con inicio <= fecha <= hoy.
+    """
+    if inicio is None:
+        inicio = inicio_reto()
     personas = {}
     for r in filas:
         f = date.fromisoformat(r["fecha"])
-        if f > hoy:
+        clave = re.sub(r"\D", "", r["celular"] or "") or f"{r['nombre']}|{r['apellido']}".casefold()
+        p = personas.setdefault(clave, {"servicios": [], "ultimo": date.min, "nombre": "", "apellido": ""})
+        if f >= p["ultimo"]:
+            p["ultimo"], p["nombre"], p["apellido"] = f, r["nombre"], r["apellido"]
+        if f < inicio or f > hoy:
             continue
         asistio = r.get("asistio")
         if asistio is None:
             if f == hoy:
                 continue
             asistio = 1 if asumir_asistencia else 0
-        clave = re.sub(r"\D", "", r["celular"] or "") or f"{r['nombre']}|{r['apellido']}".casefold()
-        p = personas.setdefault(clave, {"servicios": [], "ultimo": date.min, "nombre": "", "apellido": ""})
         p["servicios"].append((f, bool(asistio), str(r.get("misa") or "").startswith("E")))
-        if f >= p["ultimo"]:
-            p["ultimo"], p["nombre"], p["apellido"] = f, r["nombre"], r["apellido"]
 
     resultado = []
     for p in personas.values():
@@ -71,9 +87,12 @@ def calcular_ranking(filas, hoy, asumir_asistencia=ASUMIR_ASISTENCIA):
         domingos_asistidos = {f for f in asistidos if f.weekday() == 6}
         meses_perfectos = []
         for anio, mes in sorted({(f.year, f.month) for f in domingos_asistidos}):
+            if (anio, mes) < (inicio.year, inicio.month):
+                continue
             if _primer_dia_mes_siguiente(anio, mes) > hoy:
                 continue  # el bono se acredita al comenzar el mes siguiente
-            if all(d in domingos_asistidos for d in domingos_del_mes(anio, mes)):
+            requeridos = [d for d in domingos_del_mes(anio, mes) if d >= inicio]
+            if all(d in domingos_asistidos for d in requeridos):
                 meses_perfectos.append((anio, mes))
         estrellas += BONO_MES_COMPLETO * len(meses_perfectos)
 

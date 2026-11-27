@@ -254,3 +254,5 @@ dialog.dlg-cal::backdrop { background: rgba(15, 25, 40, .55); }
 
 .chk-asist { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
 .chk-asist input { width: 20px; height: 20px; }
+
+.aviso-reto { margin: 10px 0; padding: 12px 14px; border: 1px solid #1f3a5f; border-left: 5px solid #1f3a5f; border-radius: 6px; background: #eef3fa; color: #1f3a5f; font-weight: 600; }
