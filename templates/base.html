@@ -72,7 +72,20 @@
     })();
     </script>
     {% endif %}
-    {% block footer %}{% endblock %}
+    {% block footer %}
+    <footer class="legal">
+        <div class="legal-bloque" lang="es">
+            <strong>Aplicación diseñada por Curiosity Logic LLC</strong><br>
+            Todos los derechos reservados. El contenido, las marcas registradas, los logotipos y la propiedad intelectual mostrados en este sitio web están protegidos por las leyes de derechos de autor y marcas aplicables. Quedan estrictamente prohibidos su uso, reproducción o distribución no autorizados.<br>
+            Contacto: <a href="mailto:info@curiositylogic.com">info@curiositylogic.com</a>
+        </div>
+        <div class="legal-bloque" lang="en">
+            <strong>App designed by Curiosity Logic LLC</strong><br>
+            All rights reserved. The content, trademarks, logos, and intellectual property displayed on this website are protected under applicable copyright and trademark laws. Unauthorized use, reproduction, or distribution is strictly prohibited.<br>
+            Contact: <a href="mailto:info@curiositylogic.com">info@curiositylogic.com</a>
+        </div>
+    </footer>
+    {% endblock %}
     {% block scripts %}{% endblock %}
 </body>
 </html>
